@@ -1,0 +1,19 @@
+version: '3.8'
+
+networks:
+  external_network:
+    name: external_network
+
+services:
+ pos-apotek:
+    image: pos-apotek:1.0
+    build:
+      dockerfile: Dockerfile
+    container_name:  pos-apotek
+    restart: always
+    networks:
+      - external_network
+    ports:
+      - 7000:7000
+    expose:
+      - "7000"

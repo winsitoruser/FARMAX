@@ -1,0 +1,33 @@
+export const initialOpnameId = {
+  id: "",
+  Create_Date: "",
+  Officer_name: "",
+  head_name: "",
+  manager_name: "",
+  product_code: "",
+  product_id: "",
+  product_name: "",
+  purchase_unit: "",
+  qty: 0,
+  real_qty: 0,
+  total_price_difference: 0,
+  difference: 0,
+  report_type: "",
+  reason: "",
+  accept: false,
+  reject: false,
+  officer_sign: "",
+  head_sign: "",
+  manager_sign: "",
+  batch: [
+    {
+      qty: 0,
+      batch: "",
+      real_qty: 0,
+      expire_date: ''
+    },
+  ],
+  id_employer: "",
+  createdAt: "",
+  updatedAt: "",
+}
