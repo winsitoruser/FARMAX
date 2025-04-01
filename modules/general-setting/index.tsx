@@ -9,7 +9,6 @@ import ModuleProdType from "../prod-type"
 import ModulePurchase from "../purchase/module-purchase"
 import ModuleSalesUnit from "../sales-unit/module-sales-unit"
 
-
 const forms = [
   {
     value: 'prod-type',
@@ -28,28 +27,27 @@ const forms = [
     label: 'Kategori'
   }
 ]
+
 const ModuleGeneralSetting = () => {
-
-
   return (
-    <Tabs defaultValue="prod-type" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          {forms.map(({ value, label }) => (
-            <TabsTrigger key={value} value={value}>{label}</TabsTrigger>
-          ))}
-        </TabsList>
-        <TabsContent value="prod-type">
-          <ModuleProdType />
-        </TabsContent>
-        <TabsContent value="sales-unit">
-          <ModuleSalesUnit />
-        </TabsContent>
-        <TabsContent value="purchase">
-          <ModulePurchase />
-        </TabsContent>
-        <TabsContent value="category">
-          <ModuleCategory />
-        </TabsContent>
+    <Tabs defaultValue="prod-type">
+      <TabsList className="grid w-full grid-cols-4">
+        {forms.map(({ value, label }) => (
+          <TabsTrigger key={value} value={value}>{label}</TabsTrigger>
+        ))}
+      </TabsList>
+      <TabsContent value="prod-type">
+        <ModuleProdType />
+      </TabsContent>
+      <TabsContent value="sales-unit">
+        <ModuleSalesUnit />
+      </TabsContent>
+      <TabsContent value="purchase">
+        <ModulePurchase />
+      </TabsContent>
+      <TabsContent value="category">
+        <ModuleCategory />
+      </TabsContent>
     </Tabs>
   )
 }

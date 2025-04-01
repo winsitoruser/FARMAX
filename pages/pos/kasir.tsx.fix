@@ -1,0 +1,16 @@
+// Cari baris dengan onClick={() => handlePayment()} dan ganti dengan onClick yang baru
+const oldLine = /onClick={\(\) => handlePayment\(\)}/
+const newLine = 'onClick={() => { if(cart.length === 0) { toast({ title: \"Keranjang Kosong\", description: \"Tambahkan produk ke keranjang terlebih dahulu\", variant: \"destructive\" }); return; } if (!selectedCustomer) { setPaymentStep(\"customer\"); setCustomerType(\"walkin\"); setSelectedCustomerData(null); } else { setPaymentStep(\"payment\"); } setIsPaymentModalOpen(true); }}'
+
+// Baca file
+const fs = require('fs')
+let content = fs.readFileSync('/Users/beever/Downloads/POS_frontend-main/pages/pos/kasir.tsx', 'utf8')
+
+// Ganti judul tombol
+content = content.replace(/{paymentMethod === 'cash'[^}]+}/, 'Bayar')
+
+// Ganti onclick handler
+content = content.replace(/onClick={\(\) => handlePayment\(\)}/, newLine)
+
+// Tulis kembali file
+fs.writeFileSync('/Users/beever/Downloads/POS_frontend-main/pages/pos/kasir.tsx', content)

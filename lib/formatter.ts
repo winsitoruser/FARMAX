@@ -1,9 +1,8 @@
-
-export const formatRupiah = (value: number) => Intl.NumberFormat('id', {
-  currency: 'IDR',
-  style: 'currency',
-  minimumFractionDigits: 0,
-}).format(value);
+export const formatRupiah = (value: number) => {
+  // Menggunakan useEffect dan useState di komponen untuk menghindari error hydration
+  // Untuk sementara, kita standarkan formatnya
+  return `Rp${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+};
 
 export const formatDate = ({ date }: { date: Date }) => {
   let options: Intl.DateTimeFormatOptions = {

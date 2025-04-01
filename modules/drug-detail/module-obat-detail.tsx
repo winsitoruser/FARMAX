@@ -67,7 +67,9 @@ const ModuleObatDetail = () => {
     try {
       const slug = Array.isArray(router.query?.slug) ? router.query?.slug[0] : router.query?.slug || "";
       const res = await getProductById(slug);
-      setProduct(res);
+      if (res.data) {
+        setProduct(res.data);
+      }
     } finally {
       setLoading(false);
     }
@@ -77,7 +79,9 @@ const ModuleObatDetail = () => {
     try {
       const slug = Array.isArray(router.query?.slug) ? router.query?.slug[0] : router.query?.slug || "";
       const res = await getBuyerById(slug);
-      setGoods(res);
+      if (res.data) {
+        setGoods(res.data);
+      }
     } finally {
       setLoading(false);
     }

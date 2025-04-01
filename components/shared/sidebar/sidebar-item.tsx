@@ -9,15 +9,19 @@ import { useEffect, useState } from "react";
 import { IconType } from "react-icons";
 import { ReactSVG } from "react-svg";
 
-interface SidebarItemProps {
+export interface ItemSidebar {
   title: string;
   path?: string;
   icon: string;
-  dropdown?: SidebarItemProps[];
-  subdropdown?: SidebarItemProps[];
+  dropdown?: ItemSidebar[];
+  subdropdown?: ItemSidebar[];
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ title, path, icon: icon, dropdown }) => {
+interface PropsSidebarItem {
+  item: ItemSidebar;
+}
+
+const ItemSidebarKomponen: React.FC<PropsSidebarItem> = ({ item }) => {
   const { isOpen } = useSidebar();
   const { pathname } = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -40,7 +44,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ title, path, icon: icon, drop
 
   return (
     <>
-      {dropdown ? (
+      {item.dropdown ? (
         <>
           <div
             onClick={toggleDropdown}
@@ -49,97 +53,104 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ title, path, icon: icon, drop
               "flex justify-start w-full relative cursor-pointer select-none text-[#343434] hover:bg-primary hover:text-white hover:frm-menu"
             )}
           >
-            <div className="flex items-center">
-              {/* <Icon className="h-4 w-4" /> */}
-              <ReactSVG src={`${icon}`} />
-              <span className={cn("ml-3 font-['Poppins'] text-[12px]", !isOpen && "hidden")}>{title}</span>
+            <div className="mr-2 h-4 w-4">
+              <ReactSVG src={item.icon} />
             </div>
-            <div className={cn("absolute right-3", isDropdownOpen && "rotate-[90deg]")}>
-              {isOpen && <ReactSVG src={"/icons/eva_arrow-down-fill.svg"} className={cn("", !isOpen && 'hidden')} />}
-            </div>
+            <span className={cn("flex-1 text-left", !isOpen && "hidden")}>
+              {item.title}
+            </span>
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                isDropdownOpen && "rotate-90",
+                !isOpen && "hidden"
+              )}
+            />
           </div>
-
           {isDropdownOpen && (
-            <div className={cn("pl-6 space-y-1", isDropdownOpen && 'animate-out ease-out')}>
-              {dropdown.map((item, index) => (
-                item.subdropdown ?
-                  <>
-                    <div
-                      onClick={toggleSubDropdown}
-                      className={cn(
-                        buttonVariants({ variant: "ghost" }),
-                        "flex justify-start w-full relative cursor-pointer select-none text-[#343434] hover:bg-primary hover:text-white hover:frm-menu"
+            <div className={cn("ml-4 pl-2 border-l-2 border-gray-200", !isOpen && "hidden")}>
+              {item.dropdown.map((subItem, index) => (
+                <div key={index}>
+                  {subItem.subdropdown ? (
+                    <>
+                      <div
+                        onClick={toggleSubDropdown}
+                        className={cn(
+                          buttonVariants({ variant: "ghost" }),
+                          "flex justify-start w-full cursor-pointer select-none text-[#343434] hover:bg-primary hover:text-white hover:frm-menu"
+                        )}
+                      >
+                        <div className="mr-2 h-4 w-4">
+                          <ReactSVG src={subItem.icon} />
+                        </div>
+                        <span className="flex-1 text-left">{subItem.title}</span>
+                        <ChevronRight
+                          className={cn(
+                            "h-4 w-4 transition-transform duration-200",
+                            isSubDropdownOpen && "rotate-90"
+                          )}
+                        />
+                      </div>
+                      {isSubDropdownOpen && (
+                        <div className="ml-4 pl-2 border-l-2 border-gray-200">
+                          {subItem.subdropdown.map((subSubItem, subIndex) => (
+                            <Link
+                              key={subIndex}
+                              href={subSubItem.path || "#"}
+                              className={cn(
+                                buttonVariants({ variant: "ghost" }),
+                                "flex justify-start w-full text-[#343434] hover:bg-primary hover:text-white hover:frm-menu",
+                                pathname === subSubItem.path && "bg-primary text-white frm-menu"
+                              )}
+                            >
+                              <div className="mr-2 h-4 w-4">
+                                <ReactSVG src={subSubItem.icon} />
+                              </div>
+                              <span className="flex-1 text-left">{subSubItem.title}</span>
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                    >
-                      <div className="flex items-center">
-                        {/* <Icon className="h-4 w-4" /> */}
-                        <ReactSVG src={`${item.icon}`} />
-                        <span className={cn("ml-3 font-['Poppins'] text-[12px]", !isOpen && "hidden")}>{item.title}</span>
-                      </div>
-                      <div className={cn("absolute right-3", isSubDropdownOpen && "rotate-[90deg]")}>
-                        {isOpen && <ReactSVG src={"/icons/eva_arrow-down-fill.svg"} className={cn("", !isOpen && 'hidden')} />}
-                      </div>
-                    </div>
-
-                    {isSubDropdownOpen && (
-                      <div className={cn("pl-6 space-y-1", isSubDropdownOpen && 'animate-out ease-out')}>
-                        {item.subdropdown ? item.subdropdown.map((item, index) => (
-                          <Link
-                            key={index}
-                            prefetch={false}
-                            href={item.path || ''}
-                            className={cn(
-                              buttonVariants({ variant: "ghost" }),
-                              "flex justify-start w-full relative text-[#343434] hover:bg-primary hover:text-white hover:frm-menu rounded-md",
-                              pathname === item.path && 'bg-primary hover:bg-primary text-white frm-menu'
-                            )}
-                          >
-                            {/* <item.icon className="h-4 w-4" /> */}
-                            <ReactSVG src={`${item.icon}`} />
-                            <span className={cn("ml-3 font-['Poppins'] text-[12px]", !isOpen && "hidden")}>{item.title}</span>
-                          </Link>
-                        )) : ""}
-                      </div>
-                    )}
-                  </>
-                  : (
+                    </>
+                  ) : (
                     <Link
-                      key={index}
-                      prefetch={false}
-                      href={item.path || ''}
+                      href={subItem.path || "#"}
                       className={cn(
                         buttonVariants({ variant: "ghost" }),
-                        "flex justify-start w-full relative text-[#343434] hover:bg-primary hover:text-white hover:frm-menu rounded-md",
-                        pathname === item.path && 'bg-primary hover:bg-primary text-white frm-menu'
+                        "flex justify-start w-full text-[#343434] hover:bg-primary hover:text-white hover:frm-menu",
+                        pathname === subItem.path && "bg-primary text-white frm-menu"
                       )}
                     >
-                      {/* <item.icon className="h-4 w-4" /> */}
-                      <ReactSVG src={`${item.icon}`} />
-                      <span className={cn("ml-3 font-['Poppins'] text-[12px]", !isOpen && "hidden")}>{item.title}</span>
+                      <div className="mr-2 h-4 w-4">
+                        <ReactSVG src={subItem.icon} />
+                      </div>
+                      <span className="flex-1 text-left">{subItem.title}</span>
                     </Link>
-                  )
+                  )}
+                </div>
               ))}
             </div>
           )}
         </>
       ) : (
         <Link
-          key={path}
-          prefetch={false}
-          href={path || ''}
+          href={item.path || "#"}
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "flex justify-start w-full relative text-[#343434] hover:bg-primary hover:text-white hover:frm-menu",
-            pathname === path && "bg-primary hover:bg-primary text-white frm-menu"
+            "flex justify-start w-full text-[#343434] hover:bg-primary hover:text-white hover:frm-menu",
+            pathname === item.path && "bg-primary text-white frm-menu"
           )}
         >
-          {/* <Icon className="h-4 w-4" /> */}
-          <ReactSVG src={`${icon}`} />
-          <span className={cn("ml-3 font-['Poppins'] text-[12px]", !isOpen && "hidden")}>{title}</span>
+          <div className="mr-2 h-4 w-4">
+            <ReactSVG src={item.icon} />
+          </div>
+          <span className={cn("flex-1 text-left", !isOpen && "hidden")}>
+            {item.title}
+          </span>
         </Link>
       )}
     </>
   );
 };
 
-export default SidebarItem;
+export default ItemSidebarKomponen;

@@ -53,36 +53,6 @@ const ModuleRetur = () => {
       },
     },
     {
-      accessorKey: 'retur',
-      header: ({ column }) => <DataTableColumnHeader column={column} title='Jumlah Retur' />,
-      cell: ({ row }) => {
-        return <div className="w-[80px]">{row.original.detail.product_return.available}</div>
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
-    },
-    {
-      accessorKey: 'new',
-      header: ({ column }) => <DataTableColumnHeader column={column} title='Baru' />,
-      cell: ({ row }) => {
-        return <div className="w-[80px]">{row.original.detail.new_product.qty}</div>
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
-    },
-    {
-      accessorKey: 'maker',
-      header: ({ column }) => <DataTableColumnHeader column={column} title='Pembuat Laporan' />,
-      cell: ({ row }) => {
-        return <div className="w-[80px]">{row.getValue("maker")}</div>
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
-    },
-    {
       accessorKey: 'company_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title='Supplier' />,
       cell: ({ row }) => {
@@ -92,12 +62,26 @@ const ModuleRetur = () => {
         return value.includes(row.getValue(id))
       },
     },
+    {
+      accessorKey: 'maker',
+      header: ({ column }) => <DataTableColumnHeader column={column} title='Dibuat Oleh' />,
+      cell: ({ row }) => {
+        return <div className="w-[120px] capitalize">{row.getValue("maker")}</div>
+      },
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+      },
+    },
+  ], [])
 
-  ], [data])
   return (
-    <div className='space-y-4'>
+    <div className='h-full flex flex-col'>
       <Breadcrumbs
-        segments={[
+        items={[
+          {
+            title: "Dashboard",
+            href: "/",
+          },
           {
             title: "Retur Produk",
             href: "/retur-product",
@@ -105,7 +89,7 @@ const ModuleRetur = () => {
         ]}
       />
       {isLoading ? <DataTableLoading columnCount={6} /> :
-      <DataTable className='p-6' columns={columns} data={data} searchableColumns={[
+      <DataTable className='p-6' columns={columns} data={data || []} searchableColumns={[
           { id: 'code_retur', title: 'Kode Retur' }
       ]} newRowLink={'/retur-product/new'} />
       }

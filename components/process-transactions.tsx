@@ -189,7 +189,7 @@ const ProcessTransactions: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const res = await createBuyer(payload);
-      if (res.status === 201) {
+      if (res.data && res.success) {
         deleteAllInCart();
       }
     } catch (error) {

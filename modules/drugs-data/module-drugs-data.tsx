@@ -152,7 +152,7 @@ const ModuleDrugsData = () => {
             </div>
             <div>
               <p className="text-slate-500">Total Produk</p>
-              <p className="text-xl font-semibold">{data.length}</p>
+              <p className="text-xl font-semibold">{data?.length || 0}</p>
             </div>
           </div>
         }
@@ -169,7 +169,7 @@ const ModuleDrugsData = () => {
             </div>
             <div>
               <p className="text-slate-500">Bentuk Produk</p>
-              <p className="text-xl font-semibold">{dataType.length}</p>
+              <p className="text-xl font-semibold">{dataType?.length || 0}</p>
             </div>
           </div>
         }
@@ -186,7 +186,7 @@ const ModuleDrugsData = () => {
             </div>
             <div>
               <p className="text-slate-500">Kategori Produk</p>
-              <p className="text-xl font-semibold">{salesUnit.length}</p>
+              <p className="text-xl font-semibold">{salesUnit?.length || 0}</p>
             </div>
           </div>
         }
@@ -194,7 +194,7 @@ const ModuleDrugsData = () => {
       {isLoading ? <DataTableLoading columnCount={6} rowCount={6}
         isNewRowCreatable={true}
         isRowsDeletable={true} /> :
-        <DataTable className="p-6" columns={columns} data={data} newRowLink="/drugs-data/new" searchableColumns={[
+        <DataTable className="p-6" columns={columns as any} data={data || []} newRowLink="/drugs-data/new" searchableColumns={[
           {
             id: 'product_name',
             title: 'Produk'

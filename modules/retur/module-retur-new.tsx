@@ -130,7 +130,9 @@ const ModuleReturNew = () => {
   useEffect(() => {
     if (supplierId) {
       getSupplierById(supplierId).then(res => {
-        form.setValue('company_name', res.company_name)
+        if (res.data) {
+          form.setValue('company_name', res.data.company_name)
+        }
       })
 
     }

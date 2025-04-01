@@ -1,8 +1,30 @@
-import { EventClickArg, EventContentArg } from "@fullcalendar/core";
 import { format } from "date-fns";
 import idLocale from 'date-fns/locale/id';
 import React from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+
+// Definisikan interface untuk EventClickArg dan EventContentArg
+interface EventClickArg {
+  event: {
+    title: string;
+    start: Date;
+    end: Date;
+    extendedProps: any;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+interface EventContentArg {
+  event: {
+    title: string;
+    start: Date;
+    end: Date;
+    extendedProps: any;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
 
 type Props = {
   info: EventClickArg | EventContentArg | null,

@@ -1,0 +1,1451 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
+import { IconType } from "react-icons";
+import { 
+  FaCashRegister, FaShoppingCart, FaUsers, FaPercent, FaHeart, 
+  FaStore, FaCalendarAlt, FaSearch, FaSortAmountDown, FaSortAmountUp, 
+  FaFilter, FaTags, FaUserClock, FaChartPie, FaTimes, FaBars,
+  FaHome, FaMoneyBillWave, FaCreditCard, FaRegCreditCard, FaMobileAlt,
+  FaQrcode, FaMoneyBill, FaUniversity, FaBell, FaExchangeAlt,
+  FaChevronLeft, FaChevronRight, FaWallet, FaShoppingBag, FaChartBar,
+  FaPrint, FaDownload, FaSort, FaSortUp, FaSortDown, FaArrowRight, FaEye,
+  FaUserPlus, FaBoxOpen, FaPercentage, FaBolt, FaCog, FaFileInvoiceDollar,
+  FaExclamationTriangle, FaBoxes, FaTachometerAlt, FaChartLine, FaArrowUp, FaArrowDown,
+  FaTag
+} from 'react-icons/fa';
+
+// Import utilities
+import { formatRupiah } from "@/lib/formatter";
+
+// Import UI components
+import { Breadcrumbs } from "@/components/common/breadcrumbs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ClientOnly from '@/components/common/client-only';
+
+// Import chart components
+const AnalyticsChart = dynamic(() => import('@/components/dashboard/analytics-chart'), {
+  ssr: false,
+  loading: () => <div className="h-64 w-full flex items-center justify-center">Loading chart...</div>
+});
+
+// Dynamic import for Chart component
+const Chart = dynamic(() => import('react-apexcharts'), { 
+  ssr: false,
+  loading: () => <div className="h-64 w-full flex items-center justify-center">Loading chart...</div>
+});
+
+// Fallback component for when chart can't be rendered
+const ChartFallback = ({ title, icon }: { title: string, icon: React.ReactNode }) => (
+  <div className="flex flex-col items-center justify-center h-full p-6">
+    <div className="flex items-center justify-center mb-4">
+      {icon}
+      <h3 className="text-lg font-semibold ml-2">{title}</h3>
+    </div>
+    <div className="flex justify-center items-center h-[250px] w-full bg-gray-50 rounded-lg">
+      <div className="text-center p-4">
+        <p className="text-gray-500 mb-2">Data visualisasi sedang dimuat</p>
+        <p className="text-xs text-gray-400">Mohon tunggu sebentar</p>
+      </div>
+    </div>
+  </div>
+);
+
+// Menu card component with attractive orange vector icons
+const MenuCard = ({ 
+  title, 
+  icon: Icon, 
+  href, 
+  description,
+  iconBgColor = "bg-gradient-to-r from-orange-500 to-amber-500"
+}: { 
+  title: string; 
+  icon: any; 
+  href: string; 
+  description: string;
+  iconBgColor?: string;
+}) => {
+  return (
+    <Link href={href}>
+      <div className="group relative overflow-hidden bg-white rounded-2xl hover-scale neo-shadow transition-all duration-500"
+        style={{
+          background: "linear-gradient(145deg, #ffffff, #f8f8f8)",
+        }}
+      >
+        <div className="p-6 flex flex-col h-full">
+          {/* Background gradient for hover effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-amber-400 to-orange-500 opacity-0 group-hover:opacity-5 transition-opacity duration-500"></div>
+          
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-100 to-amber-200 rounded-bl-full opacity-20 transform translate-x-16 -translate-y-16 group-hover:translate-x-14 group-hover:-translate-y-14 transition-transform duration-700"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-br from-orange-200 to-amber-100 rounded-tr-full opacity-20 transform -translate-x-12 translate-y-12 group-hover:-translate-x-10 group-hover:translate-y-10 transition-transform duration-700"></div>
+          
+          {/* Floating dots decoration */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-gradient-to-br from-orange-300 to-amber-400 rounded-full opacity-30 animate-pulse"></div>
+            <div className="absolute top-3/4 left-1/2 w-3 h-3 bg-gradient-to-br from-orange-400 to-amber-300 rounded-full opacity-20 animate-pulse" style={{animationDelay: '1s'}}></div>
+            <div className="absolute top-1/2 left-3/4 w-1.5 h-1.5 bg-gradient-to-br from-amber-300 to-orange-400 rounded-full opacity-30 animate-pulse" style={{animationDelay: '0.5s'}}></div>
+          </div>
+          
+          <div className="flex items-start gap-5 relative z-10">
+            <div 
+              className={`flex items-center justify-center w-16 h-16 rounded-xl ${iconBgColor} shadow-lg transform group-hover:scale-110 transition-all duration-300`}
+              style={{
+                boxShadow: `0 10px 15px -3px rgba(251, 146, 60, 0.3), 0 4px 6px -4px rgba(251, 146, 60, 0.3)`
+              }}
+            >
+              <Icon className="text-white text-2xl drop-shadow-md" />
+            </div>
+            
+            <div className="flex-1 pt-1">
+              <h3 className="text-xl font-semibold text-gray-800 mb-2 group-hover:text-orange-600 transition-colors duration-300">{title}</h3>
+              <p className="text-gray-600 text-sm">{description}</p>
+            </div>
+          </div>
+          
+          {/* Bottom indicator */}
+          <div className="mt-auto pt-4 flex justify-end">
+            <div className="w-8 h-8 rounded-full bg-orange-100 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+              <FaArrowRight className="h-4 w-4 text-orange-500" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+// Transaction card component with hover effects and decorative elements
+const TransactionCard = ({ title, value, icon, color, percentage = null, subtitle = "" }: { 
+  title: string; 
+  value: string | number; 
+  icon: React.ReactNode; 
+  color: string;
+  percentage?: number | null;
+  subtitle?: string;
+}) => {
+  // Extract the background color class to create matching text color
+  const bgColorClass = color.replace('bg-', 'text-');
+  
+  return (
+    <div className="group relative bg-white rounded-2xl neo-shadow overflow-hidden hover-scale transition-all duration-500"
+      style={{
+        background: "linear-gradient(145deg, #ffffff, #f5f5f5)",
+      }}
+    >
+      {/* Background gradient on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-amber-400 to-orange-500 opacity-0 group-hover:opacity-5 transition-opacity duration-500"></div>
+      
+      {/* Radial gradient background */}
+      <div className="absolute inset-0 bg-radial-gradient opacity-10"></div>
+      
+      {/* Decorative corner shapes */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-100 to-amber-200 rounded-bl-full opacity-20 transform translate-x-16 -translate-y-16 group-hover:translate-x-14 group-hover:-translate-y-14 transition-transform duration-700"></div>
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-200 to-amber-100 rounded-tr-full opacity-20 transform -translate-x-12 translate-y-12 group-hover:-translate-x-10 group-hover:translate-y-10 transition-transform duration-700"></div>
+      
+      {/* Top gradient bar */}
+      <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 shadow-sm"></div>
+      
+      <div className="p-6 relative z-10">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-gray-700 font-medium mb-1 group-hover:text-orange-600 transition-colors duration-300">{title}</h3>
+            <div className="text-2xl font-bold text-gray-800 mb-1" style={{textShadow: '1px 1px 1px rgba(0,0,0,0.05)'}}>{value}</div>
+            
+            {subtitle && (
+              <div className="text-sm text-gray-500">{subtitle}</div>
+            )}
+            
+            {percentage !== null && (
+              <div className={`flex items-center mt-3 ${percentage >= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                <span className="text-sm font-bold">
+                  {percentage >= 0 ? '↑' : '↓'} {Math.abs(percentage)}%
+                </span>
+                <span className="text-xs text-gray-500 ml-1">vs kemarin</span>
+              </div>
+            )}
+            
+            {/* Mini trend line */}
+            {percentage !== null && (
+              <div className="mt-2 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${
+                    percentage >= 0 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-amber-400 to-amber-500'
+                  } rounded-full transition-all duration-1000 ease-out animate-pulse`}
+                  style={{ 
+                    width: percentage >= 0 ? `${Math.min(Math.abs(percentage) * 3, 100)}%` : '30%',
+                    animationDuration: '3s'
+                  }}
+                ></div>
+              </div>
+            )}
+          </div>
+          
+          <div 
+            className={`flex items-center justify-center w-16 h-16 rounded-xl ${color} transform group-hover:scale-110 transition-all duration-300 shadow-lg`}
+            style={{
+              boxShadow: `0 10px 15px -3px rgba(251, 146, 60, 0.3), 0 4px 6px -4px rgba(251, 146, 60, 0.3)`
+            }}
+          >
+            <div className="text-white text-2xl">
+              {icon}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Transaction detail modal component
+interface TransactionItem {
+  name: string;
+  qty: number;
+  price: number;
+  isRecipe: boolean;
+}
+
+// Define transaction interface
+interface Transaction {
+  id: string;
+  date: string;
+  customerName: string;
+  total: number;
+  status: string;
+  paymentMethod: string;
+  items: TransactionItem[];
+}
+
+const TransactionDetailModal = ({ transaction, onClose }: { transaction: Transaction; onClose: () => void }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Get payment method icon
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case 'Cash':
+        return <FaMoneyBillWave className="text-green-500" />;
+      case 'Kartu Kredit':
+        return <FaCreditCard className="text-blue-500" />;
+      case 'Kartu Debit':
+        return <FaRegCreditCard className="text-purple-500" />;
+      case 'E-Money':
+        return <FaMobileAlt className="text-orange-500" />;
+      case 'QRIS':
+        return <FaQrcode className="text-red-500" />;
+      case 'Transfer Bank':
+        return <FaUniversity className="text-indigo-500" />;
+      default:
+        return <FaMoneyBill className="text-gray-500" />;
+    }
+  };
+
+  // Add keyboard event listener for Escape key
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm animate-fadeIn">
+      <div 
+        ref={modalRef} 
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto relative animate-scaleIn"
+      >
+        {/* Decorative elements */}
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-400 via-red-500 to-red-600"></div>
+        <div className="absolute -top-4 -right-4 w-24 h-24 opacity-10 pointer-events-none">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="text-red-500 fill-current">
+            <path d="M44.3,-76.1C58.2,-69.5,71.1,-59.2,79.9,-45.6C88.7,-32,93.4,-15,93.2,1.9C93,18.8,87.8,37.6,77.6,52.7C67.4,67.8,52.1,79.1,36,85.4C19.9,91.7,3,-93,-14.4,90.2C-31.8,87.5,-49.8,80.7,-63.3,68.7C-76.9,56.7,-86,39.5,-90.6,21.2C-95.2,3,-95.2,-16.3,-88.9,-32.7C-82.6,-49.1,-69.9,-62.6,-55,-70.7C-40.1,-78.8,-23,-81.5,-5.9,-81.8C11.2,-82.1,30.4,-82.8,44.3,-76.1Z" transform="translate(100 100)" />
+          </svg>
+        </div>
+        <div className="absolute -bottom-4 -left-4 w-24 h-24 opacity-10 pointer-events-none">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="text-red-500 fill-current">
+            <path d="M44.3,-76.1C58.2,-69.5,71.1,-59.2,79.9,-45.6C88.7,-32,93.4,-15,93.2,1.9C93,18.8,87.8,37.6,77.6,52.7C67.4,67.8,52.1,79.1,36,85.4C19.9,91.7,3,-93,-14.4,90.2C-31.8,87.5,-49.8,80.7,-63.3,68.7C-76.9,56.7,-86,39.5,-90.6,21.2C-95.2,3,-95.2,-16.3,-88.9,-32.7C-82.6,-49.1,-69.9,-62.6,-55,-70.7C-40.1,-78.8,-23,-81.5,-5.9,-81.8C11.2,-82.1,30.4,-82.8,44.3,-76.1Z" transform="translate(100 100)" />
+          </svg>
+        </div>
+        
+        <div className="bg-gradient-to-r from-red-500 to-red-400 p-4 flex justify-between items-center relative">
+          <div className="flex items-center">
+            <div className="bg-white bg-opacity-20 p-2 rounded-full mr-3">
+              <FaShoppingCart className="text-white" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">Detail Transaksi #{transaction.id}</h3>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-white hover:text-gray-200 bg-white bg-opacity-20 rounded-full p-2 transition-all hover:bg-opacity-30 hover:rotate-90 duration-300"
+            aria-label="Tutup"
+          >
+            <FaTimes size={16} />
+          </button>
+        </div>
+        
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 transform transition-transform hover:scale-105 duration-300">
+              <p className="text-sm text-gray-500">Tanggal Transaksi</p>
+              <p className="text-base font-medium flex items-center">
+                <FaCalendarAlt className="text-red-500 mr-2" size={14} />
+                {transaction.date}
+              </p>
+            </div>
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 transform transition-transform hover:scale-105 duration-300">
+              <p className="text-sm text-gray-500">Pelanggan</p>
+              <p className="text-base font-medium flex items-center">
+                <FaUsers className="text-red-500 mr-2" size={14} />
+                {transaction.customerName}
+              </p>
+            </div>
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 transform transition-transform hover:scale-105 duration-300">
+              <p className="text-sm text-gray-500">Metode Pembayaran</p>
+              <div className="flex items-center">
+                <span className="mr-2">{getPaymentMethodIcon(transaction.paymentMethod)}</span>
+                <p className="text-base font-medium">{transaction.paymentMethod}</p>
+              </div>
+            </div>
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 transform transition-transform hover:scale-105 duration-300">
+              <p className="text-sm text-gray-500">Status</p>
+              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                ${transaction.status === 'Selesai' ? 'bg-green-100 text-green-800' : 
+                transaction.status === 'Diproses' ? 'bg-yellow-100 text-yellow-800' : 
+                'bg-red-100 text-red-800'}`}
+              >
+                {transaction.status}
+              </span>
+            </div>
+          </div>
+          
+          <div className="mb-6">
+            <div className="flex items-center mb-3">
+              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center mr-2">
+                <FaShoppingBag className="text-white" size={12} />
+              </div>
+              <h4 className="text-lg font-medium">Daftar Produk</h4>
+            </div>
+            <div className="border rounded-lg overflow-hidden shadow-sm">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-red-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resep</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {transaction.items.map((item: TransactionItem, index: number) => (
+                    <tr key={index} className="hover:bg-red-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.qty}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Rp {item.price.toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Rp {(item.qty * item.price).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.isRecipe ? 
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs flex items-center w-fit">
+                            <FaRegCreditCard className="mr-1" size={10} />Resep
+                          </span> : 
+                          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs flex items-center w-fit">
+                            <FaShoppingBag className="mr-1" size={10} />Non-Resep
+                          </span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div className="border-t pt-4 flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-500">Total Item: {transaction.items.reduce((sum: number, item: TransactionItem) => sum + item.qty, 0)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total Pembayaran</p>
+              <p className="text-xl font-bold text-red-600">Rp {transaction.total.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex justify-end space-x-3">
+            <button className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md flex items-center hover:bg-gray-300 transition-colors">
+              <FaPrint className="mr-2" /> Cetak
+            </button>
+            <button className="px-4 py-2 bg-red-500 text-white rounded-md flex items-center hover:bg-red-600 transition-colors">
+              <FaDownload className="mr-2" /> Unduh
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Table header with sort functionality
+const SortableHeader = ({ 
+  title, 
+  field, 
+  sortField, 
+  sortDirection, 
+  onSort 
+}: { 
+  title: string; 
+  field: string; 
+  sortField: string | null; 
+  sortDirection: 'asc' | 'desc' | null; 
+  onSort: (field: string) => void;
+}) => {
+  const isSorted = sortField === field;
+  
+  return (
+    <th 
+      scope="col" 
+      className="px-6 py-5 text-left text-sm font-medium text-gray-700 uppercase tracking-wider bg-orange-50 cursor-pointer hover:bg-orange-100 transition-colors"
+      onClick={() => onSort(field)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{title}</span>
+        <span className="text-gray-500">
+          {isSorted && sortDirection === 'asc' && <FaSortUp />}
+          {isSorted && sortDirection === 'desc' && <FaSortDown />}
+          {!isSorted && <FaSort />}
+        </span>
+      </div>
+    </th>
+  );
+};
+
+const ModulePos = () => {
+  const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
+  const [salesPeriod, setSalesPeriod] = useState<"daily" | "monthly">("daily");
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<string | null>("date");
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
+  const [transactionsPerPage, setTransactionsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Add payment method and items to the sample data
+  const recentTransactions: Transaction[] = [
+    { 
+      id: "TR-7890", 
+      date: "23 Mar 2025", 
+      customerName: "Budi Santoso", 
+      total: 450000, 
+      status: "Selesai", 
+      paymentMethod: "Cash",
+      items: [
+        { name: "Paracetamol 500mg", qty: 2, price: 15000, isRecipe: false },
+        { name: "Amoxicillin 500mg", qty: 1, price: 45000, isRecipe: true },
+        { name: "Vitamin C 1000mg", qty: 3, price: 125000, isRecipe: false }
+      ]
+    },
+    { 
+      id: "TR-7889", 
+      date: "23 Mar 2025", 
+      customerName: "Siti Aminah", 
+      total: 275000, 
+      status: "Selesai", 
+      paymentMethod: "QRIS",
+      items: [
+        { name: "Masker Medis", qty: 1, price: 75000, isRecipe: false },
+        { name: "Hand Sanitizer", qty: 2, price: 100000, isRecipe: false }
+      ]
+    },
+    { 
+      id: "TR-7888", 
+      date: "22 Mar 2025", 
+      customerName: "Ahmad Hidayat", 
+      total: 780000, 
+      status: "Diproses", 
+      paymentMethod: "Kartu Kredit",
+      items: [
+        { name: "Insulin Pen", qty: 1, price: 650000, isRecipe: true },
+        { name: "Jarum Suntik", qty: 10, price: 130000, isRecipe: false }
+      ]
+    },
+    { 
+      id: "TR-7887", 
+      date: "22 Mar 2025", 
+      customerName: "Maya Wijaya", 
+      total: 125000, 
+      status: "Dibatalkan", 
+      paymentMethod: "Kartu Debit",
+      items: [
+        { name: "Multivitamin", qty: 1, price: 125000, isRecipe: false }
+      ]
+    },
+    { 
+      id: "TR-7886", 
+      date: "21 Mar 2025", 
+      customerName: "Rudi Hartono", 
+      total: 320000, 
+      status: "Selesai", 
+      paymentMethod: "Cash",
+      items: [
+        { name: "Paracetamol 500mg", qty: 3, price: 22500, isRecipe: false },
+        { name: "Vitamin B Complex", qty: 2, price: 180000, isRecipe: false },
+        { name: "Minyak Kayu Putih", qty: 1, price: 35000, isRecipe: false },
+        { name: "Plester Luka", qty: 5, price: 82500, isRecipe: false }
+      ]
+    },
+    { 
+      id: "TR-7885", 
+      date: "21 Mar 2025", 
+      customerName: "Dewi Lestari", 
+      total: 560000, 
+      status: "Selesai", 
+      paymentMethod: "QRIS",
+      items: [
+        { name: "Vitamin C 1000mg", qty: 2, price: 83000, isRecipe: false },
+        { name: "Vitamin D3", qty: 1, price: 150000, isRecipe: false },
+        { name: "Calcium Supplement", qty: 1, price: 120000, isRecipe: false },
+        { name: "Zinc Tablet", qty: 1, price: 85000, isRecipe: false },
+        { name: "Omega 3", qty: 1, price: 122000, isRecipe: false }
+      ]
+    }
+  ];
+
+  // Calculate top 10 products for the current month
+  const getTopProducts = () => {
+    // In a real application, you would filter by current month
+    // For this demo, we'll use all transactions
+    const productMap = new Map<string, number>();
+    
+    recentTransactions.forEach(transaction => {
+      transaction.items.forEach(item => {
+        const currentCount = productMap.get(item.name) || 0;
+        productMap.set(item.name, currentCount + item.qty);
+      });
+    });
+    
+    // Convert to array, sort by quantity, and take top 10
+    const sortedProducts = Array.from(productMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    
+    return {
+      labels: sortedProducts.map(([name]) => name),
+      series: sortedProducts.map(([_, qty]) => qty)
+    };
+  };
+
+  // Calculate daily/monthly sales data for charts
+  const getDailySalesData = () => {
+    return {
+      labels: ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"],
+      values: [480000, 520000, 390000, 610000, 520000, 650000, 425000]
+    };
+  };
+
+  const getMonthlySalesData = () => {
+    return {
+      labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Des"],
+      values: [5200000, 4800000, 5600000, 4900000, 5100000, 5800000, 6100000, 5700000, 5900000, 6300000, 5800000, 6500000]
+    };
+  };
+
+  // Get payment methods data for pie chart
+  const getPaymentMethodsData = () => {
+    return {
+      labels: ["Cash", "Debit", "Credit", "QRIS", "Transfer"],
+      series: [42, 28, 15, 10, 5]
+    };
+  };
+  
+  const [salesChartData, setSalesChartData] = useState(getDailySalesData());
+  const [paymentMethodsData, setPaymentMethodsData] = useState(getPaymentMethodsData());
+  const [topProducts, setTopProducts] = useState(getTopProducts());
+
+  // Set isClient to true when component mounts (client-side only)
+  useEffect(() => {
+    setIsClient(true);
+    setTopProducts(getTopProducts());
+    setPaymentMethodsData(getPaymentMethodsData());
+  }, []);
+
+  // Update chart data when period changes
+  useEffect(() => {
+    setSalesChartData(salesPeriod === "daily" ? getDailySalesData() : getMonthlySalesData());
+  }, [salesPeriod]);
+
+  // Transaction summary data - updated with orange-red gradients
+  const transactionSummary = [
+    { 
+      title: "Penjualan Hari Ini", 
+      value: formatRupiah(725000), 
+      icon: <FaMoneyBillWave className="h-5 w-5" />, 
+      color: "bg-gradient-to-br from-orange-500 to-red-500",
+      percentage: 8.5,
+      subtitle: "23 Transaksi"
+    },
+    { 
+      title: "Produk Terjual", 
+      value: "156 Unit", 
+      icon: <FaBoxOpen className="h-5 w-5" />, 
+      color: "bg-gradient-to-br from-orange-500 to-red-500",
+      percentage: 4.2,
+      subtitle: "28 Jenis Produk"
+    },
+    { 
+      title: "Rata-rata Transaksi", 
+      value: formatRupiah(31500), 
+      icon: <FaShoppingBag className="h-5 w-5" />, 
+      color: "bg-gradient-to-br from-orange-500 to-red-500",
+      percentage: -2.1,
+      subtitle: "Per Transaksi"
+    },
+    { 
+      title: "Total Customer", 
+      value: "18", 
+      icon: <FaUsers className="h-5 w-5" />, 
+      color: "bg-gradient-to-br from-orange-500 to-red-500",
+      percentage: 6.3,
+      subtitle: "4 Pelanggan Baru"
+    }
+  ];
+
+  // Filter and pagination for transactions
+  const filteredTransactions = recentTransactions
+    .filter(transaction => 
+      transaction.customerName.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.id.toLowerCase().includes(transactionSearchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortField) return 0;
+      
+      const direction = sortDirection === 'asc' ? 1 : -1;
+      
+      switch (sortField) {
+        case 'date':
+          return a.date.localeCompare(b.date) * direction;
+        case 'customer':
+          return a.customerName.localeCompare(b.customerName) * direction;
+        case 'total':
+          return (a.total - b.total) * direction;
+        case 'status':
+          return a.status.localeCompare(b.status) * direction;
+        default:
+          return 0;
+      }
+    });
+  
+  const indexOfLastTransaction = currentPage * transactionsPerPage;
+  const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage;
+  const currentTransactions = filteredTransactions.slice(indexOfFirstTransaction, indexOfLastTransaction);
+  const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+
+  // Handle view transaction details
+  const handleViewTransaction = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionModal(true);
+  };
+
+  // Handle sort
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  // Handle search
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTransactionSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  // Transaction status badge
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Selesai':
+        return (
+          <div className="flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
+            {status}
+          </div>
+        );
+      case 'Diproses':
+        return (
+          <div className="flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+            {status}
+          </div>
+        );
+      case 'Dibatalkan':
+        return (
+          <div className="flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
+            {status}
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center justify-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            {status}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Enhanced decorative background elements */}
+      <div className="fixed top-20 right-10 w-72 h-72 bg-gradient-to-br from-orange-300 to-red-200 rounded-full opacity-15 blur-3xl -z-10"></div>
+      <div className="fixed bottom-40 left-10 w-96 h-96 bg-gradient-to-br from-amber-300 to-orange-200 rounded-full opacity-15 blur-3xl -z-10"></div>
+      <div className="fixed top-1/3 left-1/4 w-24 h-24 bg-gradient-to-br from-red-200 to-orange-300 rounded-full opacity-10 blur-xl -z-10"></div>
+      <div className="fixed bottom-1/3 right-1/4 w-32 h-32 bg-gradient-to-br from-amber-200 to-orange-300 rounded-full opacity-10 blur-xl -z-10"></div>
+      
+      {/* Welcome Header - Enhanced with more decorative elements */}
+      <div className="mb-8 relative">
+        <div className="absolute -top-10 -left-12 w-48 h-48 bg-gradient-to-br from-orange-200 to-red-100 rounded-full opacity-25 blur-lg transform rotate-12"></div>
+        <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-gradient-to-br from-red-100 to-orange-200 rounded-full opacity-25 blur-lg"></div>
+        
+        {/* Floating decorative elements */}
+        <div className="absolute top-10 right-20 w-4 h-4 bg-gradient-to-br from-orange-400 to-red-300 rounded-full opacity-60 animate-pulse"></div>
+        <div className="absolute top-24 right-40 w-3 h-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full opacity-60 animate-pulse" style={{animationDelay: '0.5s'}}></div>
+        <div className="absolute top-16 right-60 w-2 h-2 bg-gradient-to-br from-red-400 to-orange-500 rounded-full opacity-60 animate-pulse" style={{animationDelay: '1s'}}></div>
+        
+        {/* Decorative dotted pattern */}
+        <div className="absolute top-6 left-20 flex space-x-1.5">
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-300 opacity-60"></span>
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-400 opacity-60"></span>
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-500 opacity-60"></span>
+        </div>
+        <div className="absolute bottom-6 right-24 flex space-x-1.5">
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-300 opacity-60"></span>
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-400 opacity-60"></span>
+          <span className="block w-1.5 h-1.5 rounded-full bg-orange-500 opacity-60"></span>
+        </div>
+        
+        <Card className="border-orange-100 bg-white overflow-hidden relative z-10">
+          {/* Enhanced top gradient bar */}
+          <div className="h-3 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.3)_0%,_transparent_60%)] w-full h-full"></div>
+          </div>
+          
+          <CardContent className="p-8 relative overflow-hidden">
+            {/* Enhanced decorative elements */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-orange-100 to-red-100 rounded-full opacity-30 transform translate-x-40 -translate-y-28"></div>
+            <div className="absolute bottom-0 left-0 w-60 h-60 bg-gradient-to-br from-red-100 to-orange-100 rounded-full opacity-30 transform -translate-x-20 translate-y-20"></div>
+            
+            {/* Pattern overlay */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="absolute inset-0" style={{background: 'radial-gradient(circle at 20px 20px, rgba(251, 146, 60, 0.2) 0, rgba(251, 146, 60, 0.2) 2px, transparent 0), radial-gradient(circle at 40px 40px, rgba(251, 146, 60, 0.2) 0, rgba(251, 146, 60, 0.2) 2px, transparent 0)', backgroundSize: '40px 40px'}}></div>
+            </div>
+            
+            <div className="flex flex-col md:flex-row items-center justify-between relative z-10">
+              <div className="flex-1 text-center md:text-left mb-4 md:mb-0">
+                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 mb-2">Selamat Datang Kembali, Admin</h1>
+                <p className="text-orange-600 text-lg">Kelola transaksi dan layanan toko Anda</p>
+                <div className="mt-4 flex flex-wrap gap-3 justify-center md:justify-start">
+                  <Badge className="bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200 px-3 py-1">
+                    <FaShoppingCart className="mr-1.5 h-3.5 w-3.5" /> 23 Transaksi Hari Ini
+                  </Badge>
+                  <Badge className="bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200 px-3 py-1">
+                    <FaMoneyBillWave className="mr-1.5 h-3.5 w-3.5" /> Rp 7.250.000
+                  </Badge>
+                  <Badge className="bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 border-orange-200 px-3 py-1">
+                    <FaCalendarAlt className="mr-1.5 h-3.5 w-3.5" /> Maret 2025
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="relative">
+                {/* Animated blob background for the icon */}
+                <div className="absolute inset-0 transform -translate-x-3 -translate-y-3 scale-125 opacity-30">
+                  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-36 h-36 animate-blob">
+                    <path fill="url(#blobGradient)" d="M45.3,-58.6C58.3,-47.8,68.5,-32.4,73.8,-14.7C79.1,3,79.5,23,71.1,37.8C62.8,52.7,45.6,62.3,28.2,68.2C10.8,74.1,-6.9,76.3,-24.2,72.3C-41.5,68.3,-58.3,58.2,-65.3,43.5C-72.3,28.8,-69.5,9.6,-64.9,-7.8C-60.3,-25.3,-54.1,-41,-42.9,-51.9C-31.7,-62.8,-15.9,-68.9,0.8,-69.9C17.5,-70.9,32.3,-69.4,45.3,-58.6Z" transform="translate(100 100)" />
+                    <defs>
+                      <linearGradient id="blobGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#f97316" />
+                        <stop offset="100%" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                
+                {/* Icon container */}
+                <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-xl relative z-10 animate-float">
+                  <FaTachometerAlt className="h-10 w-10 text-white drop-shadow-md" />
+                  
+                  {/* Inner glow */}
+                  <div className="absolute inset-0 rounded-2xl bg-white opacity-20 blur-md"></div>
+                </div>
+                
+                {/* Decorative dots around the icon */}
+                <div className="absolute -top-2 -right-2 w-3 h-3 rounded-full bg-red-400 animate-ping" style={{animationDuration: '3s'}}></div>
+                <div className="absolute -bottom-1 -left-1 w-2 h-2 rounded-full bg-orange-400 animate-ping" style={{animationDuration: '2.5s'}}></div>
+              </div>
+            </div>
+          </CardContent>
+          
+          {/* Bottom decorative bar */}
+          <div className="h-1 w-full bg-gradient-to-r from-orange-400 via-red-300 to-orange-400"></div>
+        </Card>
+      </div>
+
+      {/* Grid Card Menu */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div>
+          <Card className="overflow-hidden border-orange-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group relative" onClick={() => router.push('/finance')}>
+            <div className="h-2 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+            <CardHeader className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100 flex flex-row items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-base font-bold text-orange-800">Finance</CardTitle>
+                <CardDescription>Keuangan dan Pajak</CardDescription>
+              </div>
+              <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
+                <FaFileInvoiceDollar className="h-6 w-6 text-white" />
+                <div className="absolute inset-0 rounded-full bg-orange-500 opacity-20 blur-sm animate-pulse"></div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="text-sm text-gray-600 mb-4">
+                Pantau arus kas, laporan keuangan dan pengelolaan pajak
+              </div>
+              <div className="flex justify-between items-center">
+                <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                  <FaMoneyBillWave className="mr-1 h-3 w-3" /> 5 faktur baru
+                </Badge>
+                <FaArrowRight className="text-orange-500 transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <Card className="overflow-hidden border-orange-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group relative" onClick={() => router.push('/customers')}>
+            <div className="h-2 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+            <CardHeader className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100 flex flex-row items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-base font-bold text-orange-800">Customers</CardTitle>
+                <CardDescription>Data Pelanggan</CardDescription>
+              </div>
+              <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
+                <FaUsers className="h-6 w-6 text-white" />
+                <div className="absolute inset-0 rounded-full bg-orange-500 opacity-20 blur-sm animate-pulse"></div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="text-sm text-gray-600 mb-4">
+                Kelola data pelanggan, histori pembelian dan program loyalitas
+              </div>
+              <div className="flex justify-between items-center">
+                <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                  <FaUserPlus className="mr-1 h-3 w-3" /> 12 baru bulan ini
+                </Badge>
+                <FaArrowRight className="text-orange-500 transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <Card className="overflow-hidden border-orange-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer group relative" onClick={() => router.push('/products')}>
+            <div className="h-2 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+            <CardHeader className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100 flex flex-row items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-base font-bold text-orange-800">Products</CardTitle>
+                <CardDescription>Katalog Produk</CardDescription>
+              </div>
+              <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
+                <FaBoxes className="h-6 w-6 text-white" />
+                <div className="absolute inset-0 rounded-full bg-orange-500 opacity-20 blur-sm animate-pulse"></div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="text-sm text-gray-600 mb-4">
+                Kelola katalog produk, harga, kategori dan deskripsi item
+              </div>
+              <div className="flex justify-between items-center">
+                <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">
+                  <FaTags className="mr-1 h-3 w-3" /> 850+ produk
+                </Badge>
+                <FaArrowRight className="text-orange-500 transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      
+      {/* Rest of POS module content */}
+      {/* Main Header Section - Styled with orange-red gradients */}
+      <div className="relative mb-8">
+        {/* Decorative background elements */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-gradient-to-br from-orange-100 to-red-50 rounded-full opacity-40 blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-gradient-to-br from-red-50 to-orange-100 rounded-full opacity-40 blur-3xl pointer-events-none"></div>
+        
+        {/* Section Header */}
+        <div className="flex items-center mb-6">
+          <div className="p-2.5 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 mr-3 shadow-md">
+            <FaTachometerAlt className="h-5 w-5 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800">Point of Sale Dashboard</h2>
+          <div className="ml-auto flex space-x-1.5">
+            <div className="h-1.5 w-6 bg-orange-300 opacity-60 rounded-full"></div>
+            <div className="h-1.5 w-10 bg-red-400 opacity-80 rounded-full"></div>
+            <div className="h-1.5 w-4 bg-orange-500 opacity-70 rounded-full"></div>
+          </div>
+        </div>
+
+        {/* Stats Cards - 4 columns with modern design */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {transactionSummary.map((card, index) => (
+            <Card key={index} className="overflow-hidden border-orange-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer relative">
+              {/* Top decorative bar */}
+              <div className="h-2 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+              
+              {/* Decorative elements */}
+              <div className="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-br from-orange-100 to-red-50 rounded-full opacity-30 blur-md"></div>
+              <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-gradient-to-br from-red-50 to-orange-100 rounded-full opacity-30 blur-md"></div>
+              
+              <CardHeader className="pb-2 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
+                <div className="flex items-center">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 mr-3 shadow-sm">
+                    <FaChartLine className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-orange-800">{card.title}</CardTitle>
+                    <CardDescription className="text-sm text-orange-600/70">{card.subtitle}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-2xl font-bold text-gray-800">{card.value}</p>
+                    <div className={`flex items-center text-xs mt-1 ${card.percentage >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {card.percentage >= 0 ? (
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <FaArrowDown className="h-3 w-3 mr-1" />
+                      )}
+                      <span>{Math.abs(card.percentage)}%</span>
+                      <span className="text-gray-500 ml-1">vs kemarin</span>
+                    </div>
+                  </div>
+                  
+                  {/* Mini Progress Bar */}
+                  <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${
+                        card.percentage >= 0 ? 'bg-gradient-to-r from-green-400 to-green-500' : 'bg-gradient-to-r from-red-400 to-red-500'
+                      } rounded-full`}
+                      style={{ width: `${Math.min(Math.abs(card.percentage) * 10, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Sales Chart Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <Card className="border shadow-sm h-full overflow-hidden relative">
+              {/* Decorative elements */}
+              <div className="absolute -top-12 -right-12 w-40 h-40 bg-gradient-to-br from-orange-100 to-red-50 rounded-full opacity-30 blur-md"></div>
+              <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-gradient-to-br from-red-50 to-orange-100 rounded-full opacity-30 blur-md"></div>
+              <div className="absolute top-1/3 right-1/3 w-8 h-8 bg-red-200 rounded-full opacity-20"></div>
+              <div className="absolute bottom-1/3 left-1/4 w-8 h-8 bg-orange-200 rounded-full opacity-20"></div>
+              
+              {/* Top decorative bar */}
+              <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+              
+              <CardHeader className="pb-2 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 mr-3 shadow-sm">
+                      <FaChartLine className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold text-orange-800">Penjualan Overview</CardTitle>
+                      <CardDescription className="text-sm text-orange-600/70">Trend Penjualan</CardDescription>
+                    </div>
+                  </div>
+
+                  <Tabs 
+                    value={salesPeriod} 
+                    onValueChange={(value) => setSalesPeriod(value as "daily" | "monthly")}
+                    className="relative z-10"
+                  >
+                    <TabsList className="h-8 p-1 bg-orange-100/70 border border-orange-200">
+                      <TabsTrigger 
+                        value="daily" 
+                        className="text-xs px-3 rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white"
+                      >
+                        Harian
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="monthly" 
+                        className="text-xs px-3 rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white"
+                      >
+                        Bulanan
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-4 relative z-10">
+                {/* Stats summary */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="flex flex-col items-center bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-3 border border-orange-100">
+                    <span className="text-xs text-orange-500 font-medium mb-1">Total Penjualan</span>
+                    <span className="text-lg font-bold text-gray-800">{formatRupiah(salesPeriod === "daily" ? 3600000 : 67800000)}</span>
+                    <div className="flex items-center text-xs mt-1">
+                      <span className="text-emerald-500 font-medium flex items-center">
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                        5.2%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-3 border border-orange-100">
+                    <span className="text-xs text-orange-500 font-medium mb-1">Transaksi</span>
+                    <span className="text-lg font-bold text-gray-800">{salesPeriod === "daily" ? 145 : 2350}</span>
+                    <div className="flex items-center text-xs mt-1">
+                      <span className="text-emerald-500 font-medium flex items-center">
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                        3.8%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-3 border border-orange-100">
+                    <span className="text-xs text-orange-500 font-medium mb-1">Avg. Transaksi</span>
+                    <span className="text-lg font-bold text-gray-800">{formatRupiah(salesPeriod === "daily" ? 24827 : 28851)}</span>
+                    <div className="flex items-center text-xs mt-1">
+                      <span className="text-emerald-500 font-medium flex items-center">
+                        <FaArrowUp className="h-3 w-3 mr-1" />
+                        1.4%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Sales Chart */}
+                <div className="bg-white rounded-lg p-4 border border-orange-100 relative">
+                  {/* Subtle decorative elements */}
+                  <div className="absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-full opacity-20 blur-lg"></div>
+                  <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-gradient-to-br from-red-200 to-orange-100 rounded-full opacity-20 blur-lg"></div>
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-700">Penjualan {salesPeriod === "daily" ? "Minggu Ini" : "Tahun Ini"}</h3>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 mr-1 inline-block"></span>
+                        {salesPeriod === "daily" ? "7 Hari Terakhir" : "12 Bulan Terakhir"}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="h-64">
+                    {isClient && (
+                      <AnalyticsChart 
+                        title=""
+                        subtitle=""
+                        chartType="area"
+                        chartHeight={250}
+                        data={{
+                          labels: salesChartData.labels,
+                          datasetLabel: 'Penjualan',
+                          values: salesChartData.values
+                        }}
+                        colorScheme="danger"
+                        hideHeader={true}
+                        gradient={true}
+                        customGradient={{
+                          start: "#f97316", // orange-500
+                          end: "#ef4444",   // red-500
+                          opacity: 0.5
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Payment Methods Pie Chart */}
+          <Card className="border shadow-sm overflow-hidden relative">
+            {/* Decorative elements */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br from-orange-100 to-red-50 rounded-full opacity-30 blur-md"></div>
+            <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-gradient-to-br from-red-50 to-orange-100 rounded-full opacity-30 blur-md"></div>
+            
+            {/* Top decorative bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+            
+            <CardHeader className="pb-2 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
+              <div className="flex items-center">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 mr-3 shadow-sm">
+                  <FaChartPie className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-semibold text-orange-800">Metode Pembayaran</CardTitle>
+                  <CardDescription className="text-sm text-orange-600/70">Distribusi metode pembayaran</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-4 relative z-10">
+              <div className="h-64">
+                {isClient && (
+                  <Chart 
+                    options={{
+                      chart: {
+                        type: 'pie',
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      },
+                      labels: paymentMethodsData.labels,
+                      legend: {
+                        position: 'bottom',
+                        fontSize: '13px'
+                      },
+                      colors: ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#3b82f6'],
+                      stroke: {
+                        width: 0
+                      },
+                      dataLabels: {
+                        enabled: true,
+                        style: {
+                          fontSize: '12px',
+                          fontWeight: 600,
+                        },
+                        dropShadow: {
+                          enabled: true,
+                          blur: 3,
+                          opacity: 0.2
+                        }
+                      },
+                      tooltip: {
+                        y: {
+                          formatter: (value) => `${value}%`
+                        }
+                      },
+                      plotOptions: {
+                        pie: {
+                          expandOnClick: true,
+                          donut: {
+                            size: '0%'
+                          }
+                        }
+                      },
+                      responsive: [{
+                        breakpoint: 480,
+                        options: {
+                          chart: {
+                            height: 250
+                          },
+                          legend: {
+                            position: 'bottom'
+                          }
+                        }
+                      }]
+                    }}
+                    series={paymentMethodsData.series}
+                    type="pie"
+                    height={250}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      
+      {/* Recent Transactions Section */}
+      <Card className="border shadow-sm overflow-hidden relative mb-8">
+        {/* Decorative elements */}
+        <div className="absolute -top-16 -right-16 w-48 h-48 bg-gradient-to-br from-orange-100 to-red-50 rounded-full opacity-30 blur-md"></div>
+        <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-gradient-to-br from-red-50 to-orange-100 rounded-full opacity-30 blur-md"></div>
+        <div className="absolute top-1/3 left-1/4 w-6 h-6 bg-orange-200 rounded-full opacity-20"></div>
+        <div className="absolute bottom-1/3 right-1/4 w-8 h-8 bg-red-200 rounded-full opacity-20"></div>
+        
+        {/* Top decorative bar */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+        
+        <CardHeader className="pb-2 bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-100">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 mr-3 shadow-sm">
+                <FaFileInvoiceDollar className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold text-orange-800">Transaksi Terbaru</CardTitle>
+                <CardDescription className="text-sm text-orange-600/70">Riwayat transaksi terbaru</CardDescription>
+              </div>
+            </div>
+            
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaSearch className="h-3.5 w-3.5 text-gray-400" />
+              </div>
+              <Input 
+                type="text"
+                placeholder="Cari transaksi..."
+                className="pl-9 pr-4 bg-white border-orange-100 focus:ring-orange-500 focus:border-orange-500 text-sm rounded-md"
+                value={transactionSearchTerm}
+                onChange={handleSearchChange}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        
+        <div className="overflow-x-auto">
+          {currentTransactions.length > 0 ? (
+            <table className="min-w-full divide-y divide-orange-100">
+              <thead>
+                <tr className="bg-gradient-to-r from-orange-50 to-red-50">
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider cursor-pointer hover:bg-orange-100/50 transition-colors"
+                    onClick={() => handleSort('date')}
+                  >
+                    <div className="flex items-center">
+                      <span>Tanggal</span>
+                      <span className="ml-1 text-orange-500">
+                        {sortField === 'date' && (
+                          sortDirection === 'asc' ? <FaSortUp className="h-3 w-3" /> : <FaSortDown className="h-3 w-3" />
+                        )}
+                        {sortField !== 'date' && <FaSort className="h-3 w-3 opacity-50" />}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider cursor-pointer hover:bg-orange-100/50 transition-colors"
+                    onClick={() => handleSort('id')}
+                  >
+                    <div className="flex items-center">
+                      <span>ID</span>
+                      <span className="ml-1 text-orange-500">
+                        {sortField === 'id' && (
+                          sortDirection === 'asc' ? <FaSortUp className="h-3 w-3" /> : <FaSortDown className="h-3 w-3" />
+                        )}
+                        {sortField !== 'id' && <FaSort className="h-3 w-3 opacity-50" />}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider cursor-pointer hover:bg-orange-100/50 transition-colors"
+                    onClick={() => handleSort('customer')}
+                  >
+                    <div className="flex items-center">
+                      <span>Pelanggan</span>
+                      <span className="ml-1 text-orange-500">
+                        {sortField === 'customer' && (
+                          sortDirection === 'asc' ? <FaSortUp className="h-3 w-3" /> : <FaSortDown className="h-3 w-3" />
+                        )}
+                        {sortField !== 'customer' && <FaSort className="h-3 w-3 opacity-50" />}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider cursor-pointer hover:bg-orange-100/50 transition-colors"
+                    onClick={() => handleSort('total')}
+                  >
+                    <div className="flex items-center">
+                      <span>Total</span>
+                      <span className="ml-1 text-orange-500">
+                        {sortField === 'total' && (
+                          sortDirection === 'asc' ? <FaSortUp className="h-3 w-3" /> : <FaSortDown className="h-3 w-3" />
+                        )}
+                        {sortField !== 'total' && <FaSort className="h-3 w-3 opacity-50" />}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider cursor-pointer hover:bg-orange-100/50 transition-colors"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      <span>Status</span>
+                      <span className="ml-1 text-orange-500">
+                        {sortField === 'status' && (
+                          sortDirection === 'asc' ? <FaSortUp className="h-3 w-3" /> : <FaSortDown className="h-3 w-3" />
+                        )}
+                        {sortField !== 'status' && <FaSort className="h-3 w-3 opacity-50" />}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-orange-800 uppercase tracking-wider"
+                  >
+                    Metode
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-right text-xs font-medium text-orange-800 uppercase tracking-wider"
+                  >
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-orange-100">
+                {currentTransactions.map((transaction, index) => (
+                  <tr key={transaction.id} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}`}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {transaction.date}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-gray-900">{transaction.id}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center text-orange-800 font-medium text-xs">
+                          {transaction.customerName.split(' ').map(word => word[0]).join('')}
+                        </div>
+                        <span className="ml-2 text-sm text-gray-900">{transaction.customerName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatRupiah(transaction.total)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(transaction.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center">
+                        {transaction.paymentMethod === 'Cash' && <FaMoneyBill className="h-3.5 w-3.5 text-green-500 mr-1.5" />}
+                        {transaction.paymentMethod === 'QRIS' && <FaQrcode className="h-3.5 w-3.5 text-blue-500 mr-1.5" />}
+                        {transaction.paymentMethod === 'Kartu Kredit' && <FaCreditCard className="h-3.5 w-3.5 text-red-500 mr-1.5" />}
+                        {transaction.paymentMethod === 'Kartu Debit' && <FaRegCreditCard className="h-3.5 w-3.5 text-indigo-500 mr-1.5" />}
+                        {transaction.paymentMethod === 'Transfer' && <FaUniversity className="h-3.5 w-3.5 text-purple-500 mr-1.5" />}
+                        {transaction.paymentMethod}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                        onClick={() => handleViewTransaction(transaction)}
+                      >
+                        <FaEye className="h-3.5 w-3.5 mr-1.5" />
+                        Detail
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <FaExclamationTriangle className="h-10 w-10 text-orange-300 mx-auto mb-3" />
+              <p>Tidak ada transaksi yang ditemukan</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Pagination */}
+        {filteredTransactions.length > transactionsPerPage && (
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 px-4 py-3 border-t border-orange-100 sm:px-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Menampilkan <span className="font-medium">{indexOfFirstTransaction + 1}</span> s/d <span className="font-medium">
+                    {Math.min(indexOfLastTransaction, filteredTransactions.length)}
+                  </span> dari <span className="font-medium">{filteredTransactions.length}</span> transaksi
+                </p>
+              </div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border text-sm font-medium ${
+                    currentPage === 1 
+                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'border-orange-300 bg-white text-orange-500 hover:bg-orange-50'
+                  }`}
+                >
+                  <span className="sr-only">Previous</span>
+                  <FaChevronLeft className="h-3 w-3" />
+                </button>
+                
+                {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`relative inline-flex items-center px-3 py-2 border text-sm font-medium
+                        ${currentPage === pageNum 
+                          ? 'z-10 bg-gradient-to-r from-orange-500 to-red-500 text-white border-orange-500' 
+                          : 'bg-white border-orange-200 text-gray-700 hover:bg-orange-50'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border text-sm font-medium ${
+                    currentPage === totalPages 
+                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'border-orange-300 bg-white text-orange-500 hover:bg-orange-50'
+                  }`}
+                >
+                  <span className="sr-only">Next</span>
+                  <FaChevronRight className="h-3 w-3" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Transaction Modal */}
+      {showTransactionModal && selectedTransaction && (
+        <TransactionDetailModal
+          transaction={selectedTransaction}
+          onClose={() => setShowTransactionModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default ModulePos;

@@ -1,12 +1,8 @@
-
 import { Breadcrumbs } from "@/components/common/breadcrumbs";
 import AddSchedule from "@/components/dialog/add-schedule";
 import DialogDetailSchedule from "@/components/dialog/dialog-detail-schedule";
 import useScheduler from "@/hooks/use-scheduler";
 import { ShiftSchedule } from "@/lib/constants";
-import { EventClickArg } from "@fullcalendar/core";
-import { aa } from "@fullcalendar/core/internal-common";
-import idLocaleFullCalendar from '@fullcalendar/core/locales/id';
 import interactionPlugin from "@fullcalendar/interaction";
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -36,7 +32,7 @@ type Appoiment = {
   updatedAt: string;
 }
 
-function useRenderEventContent(eventInfo: aa,) {
+function useRenderEventContent(eventInfo: any) {
 
   return (
     <div className="flex space-x-4 w-full items-center text-black" >
@@ -57,7 +53,7 @@ const SchedulerModule = () => {
   const [events, setEvents] = useState<Appoiment[]>([]);
   const [show, setShow] = useState<boolean>(false)
   const calendarRef = useRef<FullCalendar | null>(null);
-  const [selectedEventInfo, setSelectedEventInfo] = useState<EventClickArg | aa | null>(null);
+  const [selectedEventInfo, setSelectedEventInfo] = useState<any | null>(null);
 
   useEffect(() => {
     if (isLoading) {
@@ -136,14 +132,14 @@ const SchedulerModule = () => {
               allDaySlot={false}
               nowIndicator={false}
               editable={true}
-              eventContent={(eventInfo) => useRenderEventContent(eventInfo)}
-              locale={idLocaleFullCalendar}
+              eventContent={(eventInfo: any) => useRenderEventContent(eventInfo)}
+              locale="id"
               selectable={true}
               slotDuration={"01:00:00"}
               slotMinTime={"07:00:00"}
               slotMaxTime={"24:00:00"}
               height={"auto"}
-              eventClick={(info) => {
+              eventClick={(info: any) => {
                 info.jsEvent.preventDefault();
                 if (info.event.id) {
                   setShow(!show);
@@ -159,7 +155,7 @@ const SchedulerModule = () => {
                 right: 'timeGridWeek,timeGridDay'
               }}
               slotLabelFormat={{ hour: "numeric", minute: "2-digit", hour12: false }}
-              dayHeaderContent={(args) => (
+              dayHeaderContent={(args: any) => (
                 <div className="hms-title-dayheader">
                   <span>{format(args.date, 'eeee', { locale: idLocale })}</span>
                   <p>{format(args.date, 'd')}</p>

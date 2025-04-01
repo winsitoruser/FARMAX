@@ -97,12 +97,8 @@ const NewStaffModule = () => {
     fd.append('age', calculateAge(form.getValues('dob')).toString());
 
     try {
-      const res = await fetch(`${BASE_URL}/staff`, {
-        method: 'POST',
-        body: fd,
-      });
-
-      if (res.ok || res.status === 201) {
+      const result = await createStaff(fd);
+      if (result.success) {
         mutate(`${BASE_URL}/staff`);
         toastAlert('Berhasil menambahkan staff', 'success');
         form.reset();

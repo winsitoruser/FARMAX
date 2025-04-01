@@ -33,7 +33,7 @@ const initialProductInfo = {
 const FormDefecta = () => {
   const { data, getSupplierById } = useSupplier()
   const [supplierId, setSupplierId] = useState("");
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<any[]>([])
 
   const form = useForm<OrderDefecta>({
     resolver: zodResolver(OrderDefectaSchema),
@@ -63,7 +63,11 @@ const FormDefecta = () => {
 
   const fetchSupplierById = async () => {
     const res = await getSupplierById(supplierId)
-    setProducts(res.product)
+    if (res.data?.product) {
+      setProducts(res.data.product as any[])
+    } else {
+      setProducts([])
+    }
   }
 
 

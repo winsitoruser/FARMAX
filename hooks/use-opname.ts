@@ -2,14 +2,16 @@ import { BASE_URL } from "@/lib/constants";
 import fetcher from "@/lib/fetcher";
 import { RetriveOpname } from "@/types/opname";
 import useSWR, { mutate } from "swr";
-import { toastAlert } from '@/components/common/alerts'
+import { ApiResponse, handleApiResponse } from '@/lib/api-utils';
+import { toastAlert } from '@/components/common/alerts';
 
 type Props = {
   status: number,
   data: RetriveOpname[]
 }
+
 const useOpname = () => {
-  const { data: opnames, isLoading } = useSWR<Props>(`${BASE_URL}/stock/opname/all`, fetcher);
+  const { data: opnames, isLoading, error } = useSWR<Props>(`${BASE_URL}/stock/opname/all`, fetcher);
 
   const sortOrders = (sortBy: 'createdAt' | 'updatedAt') => {
     if (opnames) {
@@ -22,84 +24,115 @@ const useOpname = () => {
     return [];
   };
 
+  const refreshOpname = () => {
+    mutate(`${BASE_URL}/stock/opname/all`);
+  };
 
-  const performRequest = async (method: string = 'GET', url: string, formData: FormData | undefined = undefined, rest: any = {}) => {
+  const performRequest = async <T>(
+    method: string = 'GET', 
+    url: string, 
+    formData?: FormData, 
+    showToast: boolean = true
+  ): Promise<ApiResponse<T>> => {
     try {
       const response = await fetch(url, {
         method,
-        ...rest,
         body: formData,
       });
 
-      if (response.ok) {
-        return response.json();
-      } else {
-        console.error('Request failed with status:', response.status);
-        const responseText = await response.text();
-        console.error('Response body:', responseText);
-        toastAlert('Request failed with status ' + response.status, 'error');
+      return await handleApiResponse<T>(response, showToast);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Request failed';
+      if (showToast) {
+        toastAlert(errorMessage, 'error');
       }
-    } catch (error) {
-      console.error('Request failed with an error:', error);
-      toastAlert(error as string, 'error');
+      return { data: null, error: errorMessage, success: false, status: 500 };
     }
-  }
+  };
 
-
-  const handleRequest = async (method: string, url: string, formData: FormData | null, successMessage: string) => {
+  const handleRequest = async (
+    method: string, 
+    url: string, 
+    formData: FormData | null, 
+    successMessage: string
+  ): Promise<ApiResponse<any>> => {
     try {
-      await performRequest(method, url, formData !== null ? formData : undefined);
-      toastAlert(successMessage, 'success');
-      refreshOpname();
+      const result = await performRequest(
+        method, 
+        url, 
+        formData || undefined
+      );
+
+      if (result.success) {
+        refreshOpname();
+        toastAlert(successMessage, 'success');
+      }
+
+      return result;
     } catch (error) {
-      toastAlert(`Failed to ${successMessage.toLowerCase()}`, 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Request failed';
+      toastAlert(errorMessage, 'error');
+      return { data: null, error: errorMessage, success: false, status: 500 };
     }
-  }
+  };
 
+  const createOpname = async (formData: FormData): Promise<ApiResponse<any>> => {
+    return handleRequest(
+      'POST',
+      `${BASE_URL}/stock/opname/create`,
+      formData,
+      'Stock opname berhasil dibuat'
+    );
+  };
 
-  const refreshOpname = () => {
-    mutate(`${BASE_URL}/stock/opname/all`);
-  }
+  const updateOpname = async (id: string, formData: FormData): Promise<ApiResponse<any>> => {
+    return handleRequest(
+      'PUT',
+      `${BASE_URL}/stock/opname/update?opname_id=${id}`,
+      formData,
+      'Stock opname berhasil diperbarui'
+    );
+  };
 
-  const createOpname = async (formData: FormData) => {
-    handleRequest('POST', `${BASE_URL}/stock/opname`, formData, 'Opname created successfully');
-  }
+  const deleteOpname = async (id: string): Promise<ApiResponse<any>> => {
+    return handleRequest(
+      'DELETE',
+      `${BASE_URL}/stock/opname/delete?opname_id=${id}`,
+      null,
+      'Stock opname berhasil dihapus'
+    );
+  };
 
-  const updateOpname = async (id: string, formData: FormData) => {
-    handleRequest('PATCH', `${BASE_URL}/stock/opname/?id_opname=${id}`, formData, 'Opname updated successfully');
-  }
+  const getOpnameById = async (id: string): Promise<ApiResponse<any>> => {
+    return performRequest(
+      'GET',
+      `${BASE_URL}/stock/opname/id?opname_id=${id}`,
+      undefined,
+      false
+    );
+  };
 
-  const deleteOpname = async (id: string) => {
-    handleRequest('DELETE', `${BASE_URL}/stock/opname/id?id_opname=${id}`, null, 'Opname deleted successfully');
-  }
+  const putStatusAcceptOpname = async (id: string, formData: FormData): Promise<ApiResponse<any>> => {
+    return handleRequest('PUT', `${BASE_URL}/stock/opname/accept?opname_id=${id}`, formData, 'Status updated successfully');
+  };
 
-  const putStatusAcceptOpname = async (id: string, formData: FormData) => {
-    handleRequest('PUT', `${BASE_URL}/stock/opname/accept?id_opname=${id}`, formData, 'Status updated successfully');
-  }
-
-  const putStatusRejectOpname = async (id: string) => {
-    handleRequest('PUT', `${BASE_URL}/stock/opname/reject?id_opname=${id}`, null, 'Status updated successfully');
-  }
-
-  const getOpnameById = async (id: string) => {
-    const url = `${BASE_URL}/stock/opname/id?id_opname=${id}`;
-    const response = await performRequest('GET', url);
-    if (response.status === 200 || 201)
-      return response.data;
-  }
-
+  const putStatusRejectOpname = async (id: string): Promise<ApiResponse<any>> => {
+    return handleRequest('PUT', `${BASE_URL}/stock/opname/reject?opname_id=${id}`, null, 'Status updated successfully');
+  };
 
   return {
-    opnames: sortOrders('createdAt'),
-    getOpnameById,
-    createOpname,
+    opnames: opnames?.data || [],
+    isLoading,
+    error,
+    sortOrders,
     refreshOpname,
-    putStatusAcceptOpname,
-    putStatusRejectOpname,
+    createOpname,
     updateOpname,
     deleteOpname,
-    isLoading
-  }
-}
+    getOpnameById,
+    putStatusAcceptOpname,
+    putStatusRejectOpname
+  };
+};
 
 export default useOpname;

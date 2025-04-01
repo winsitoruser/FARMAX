@@ -13,10 +13,10 @@ import { Contact, Mail, Phone } from "lucide-react"
 import { useRouter } from "next/router"
 import { useEffect, useMemo, useState } from "react"
 import { z } from "zod"
+import { toastAlert } from "@/components/common/alerts"
 
 type SupplierSchema = z.infer<typeof supplierSchema>
 type ProductType = z.infer<typeof productSchema>
-
 
 const ModuleDetailSupplier = () => {
   const router = useRouter();
@@ -50,8 +50,15 @@ const ModuleDetailSupplier = () => {
   const fetchData = async () => {
     try {
       const slug = Array.isArray(router.query?.slug) ? router.query?.slug[0] : router.query?.slug || "";
-      const res = await getSupplierById(slug);
-      setSupplier(res);
+      const result = await getSupplierById(slug);
+      
+      if (result.success && result.data) {
+        setSupplier(result.data);
+      } else {
+        if (result.error) {
+          toastAlert(result.error, 'error');
+        }
+      }
     } finally {
       setLoading(false);
     }

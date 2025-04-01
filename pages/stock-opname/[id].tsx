@@ -16,7 +16,20 @@ const StockOpnameId = () => {
     setLoading(true)
     const res = await getOpnameById(router.query.id as string)
     console.log(res)
-    setOpname(res)
+    if (res.data) {
+      // Type assertion to handle the API response structure
+      const responseData = res.data as any;
+      
+      // Create a properly typed object with all required fields
+      const opnameData: RetriveOpnameId = {
+        ...initialOpnameId,
+        ...responseData,
+        // Ensure batch property exists
+        batch: responseData.batch || initialOpnameId.batch
+      };
+      
+      setOpname(opnameData);
+    }
     setLoading(false)
   }
 

@@ -27,7 +27,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  swcMinify: true,
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: hostnames.map((hostname) => ({

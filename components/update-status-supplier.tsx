@@ -19,18 +19,18 @@ interface Props {
 }
 
 const UpdateStatusSupplier: React.FC<Props> = ({ id, status, company_name }) => {
-  const { updateStatusSupplier } = useSupplier()
+  const { updateSupplier } = useSupplier()
 
   const onAcceptSupplier = async () => {
     const formData = new FormData();
     formData.append("accepted_status", "accepted");
-    await updateStatusSupplier(id, formData);
+    await updateSupplier(id, { accepted_status: "accepted" });
   }
 
   const onRejectSupplier = async () => {
     const formData = new FormData();
     formData.append("accepted_status", "rejected");
-    await updateStatusSupplier(id, formData);
+    await updateSupplier(id, { accepted_status: "rejected" });
   }
 
   return (

@@ -65,15 +65,21 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: 0 },
         },
+        "ping-slow": {
+          "0%": { transform: "scale(1)", opacity: "0.8" },
+          "50%": { transform: "scale(1.5)", opacity: "0.4" },
+          "100%": { transform: "scale(1)", opacity: "0.8" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "ping-slow": "ping-slow 3s ease-in-out infinite",
       },
       height: {
         'calc-vh': 'calc(100vh - 160px)',
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require('tailwind-scrollbar')],
 }

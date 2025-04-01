@@ -66,12 +66,12 @@ const SellingModule = () => {
 
     ], []);
 
-  const totalPrescription = data.filter(transaction => transaction.prescription === true).length;
-  const totalNonPrescription = data.filter(transaction => transaction.prescription === false).length;
+  const totalPrescription = data?.filter(transaction => transaction.prescription === true).length || 0;
+  const totalNonPrescription = data?.filter(transaction => transaction.prescription === false).length || 0;
   const medUtilCount = data?.reduce((total, item) => total + item.med_util_id.length, 0) || 0;
-  const totalBuyerExpenditure = data.reduce((acc, curr) => {
+  const totalBuyerExpenditure = data?.reduce((acc, curr) => {
     return acc + curr.buyer_expenditure;
-  }, 0);
+  }, 0) || 0;
 
   return (
     <div className="space-y-6">

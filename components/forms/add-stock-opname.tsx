@@ -29,7 +29,7 @@ type Batch = {
 }
 
 const AddStockOpname = () => {
-  const { data, isLoading } = useProduct()
+  const { products, isLoading } = useProduct()
   const { refreshOpname } = useOpname()
   const [productPrice, setProductPrice] = useState(0)
 
@@ -261,19 +261,24 @@ const AddStockOpname = () => {
               <FormItem className='flex flex-col space-y-3'>
                 <FormLabel>Cari Obat</FormLabel>
                 <FormControl>
-                  <ComboBox options={data} getOptionLabel={(opt: Products) => `${opt.product_code} - ${opt.product_name}`} selectedValue={field.value} onSelect={(opt: Products) => {
+                  <ComboBox options={products} getOptionLabel={(opt: Products) => `${opt.product_code} - ${opt.product_name}`} selectedValue={field.value} onSelect={(opt: Products) => {
                     setProductPrice(opt.price_output)
                     form.setValue('product_id', opt.id);
                     form.setValue('product_code', opt.product_code);
                     form.setValue('product_name', opt.product_name);
                     form.setValue('purchase_unit', opt.sales_unit);
                     form.setValue('qty', opt.qty);
-                    form.setValue('batch', opt.batch.map(item => ({
+                    form.setValue('batch', opt.batch?.map(item => ({
                       batch: item.batch_id,
                       qty: item.qty,
                       real_qty: item.qty,
                       expire_date: item.expire_date
-                    })))
+                    })) || [{
+                      batch: "",
+                      qty: 0,
+                      real_qty: 0,
+                      expire_date: ''
+                    }])
                   }} />
                 </FormControl>
               </FormItem>

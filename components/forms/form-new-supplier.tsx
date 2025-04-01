@@ -70,8 +70,14 @@ export default function FormNewSupplier() {
   const onSubmit = async (data: CreateSupplier) => {
     if (data.another_contact?.every(item => item.email?.trim() === '' && item.phone?.trim() === '')) {
       data.another_contact = []
+    } else if (data.another_contact) {
+      // Memastikan setiap item memiliki email dan phone yang valid
+      data.another_contact = data.another_contact.map(contact => ({
+        email: contact.email || '',
+        phone: contact.phone || ''
+      }))
     }
-    await createSupplier(data)
+    await createSupplier(data as any)
   };
 
   return (

@@ -1,5 +1,6 @@
 // export const BASE_URL = 'http://18.142.214.28:3434'
-export const BASE_URL = 'https://server.beeverclinic.online';
+// export const BASE_URL = 'https://server.beeverclinic.online';
+export const BASE_URL = 'http://localhost:5000/api';
 
 export const ShiftSchedule = [
   {

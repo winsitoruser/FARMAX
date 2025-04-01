@@ -1,0 +1,3320 @@
+import PosLayout from "@/components/layouts/pos-layout";
+import { Breadcrumbs } from "@/components/common/breadcrumbs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import useProduct from "@/hooks/use-product";
+import { SimplifiedProduct } from "@/types/simplified-products";
+import React, { 
+  createContext, 
+  useEffect, 
+  useState, 
+  useRef, 
+  useMemo, 
+  useCallback 
+} from "react";
+import { formatRupiah } from "@/lib/formatter";
+import Image from "next/image";
+import { useToast } from "@/components/ui/use-toast";
+import Link from "next/link";
+import KasirLayout from "@/components/layouts/kasir-layout";
+import BackButton from "@/components/common/back-button";
+import {
+  FaSearch,
+  FaShoppingCart,
+  FaPlus,
+  FaMinus,
+  FaTrash,
+  FaMoneyBillWave,
+  FaCreditCard,
+  FaBarcode,
+  FaUser,
+  FaUserPlus,
+  FaUserSlash,
+  FaPhone,
+  FaUpload,
+  FaTimes,
+  FaStore,
+  FaTicketAlt,
+  FaReceipt,
+  FaPrint,
+  FaCheck,
+  FaCheckCircle,
+  FaFileAlt,
+  FaPrescriptionBottleAlt,
+  FaInfoCircle,
+  FaMapMarkerAlt,
+  FaClock,
+  FaPercentage,
+  FaTag,
+  FaArrowLeft,
+  FaBoxOpen,
+  FaCashRegister,
+  FaEnvelope,
+  FaBan,
+  FaQrcode,
+  FaWhatsapp,
+  FaCalculator,
+  FaWarehouse,
+  FaChartPie,
+  FaCartPlus,
+  FaUserAlt,
+  FaUsers,
+  FaWallet,
+  FaArrowRight
+} from "react-icons/fa";
+
+// Type definitions
+interface CartItem {
+  product: SimplifiedProduct;
+  quantity: number;
+  subtotal?: number;
+}
+
+interface Promo {
+  id: number;
+  name: string;
+  description: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minPurchase: number;
+  startDate: string;
+  endDate: string;
+}
+
+interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  address: string; // Ubah dari opsional menjadi wajib
+}
+
+// Definisi CartContext
+interface CartContextType {
+  selectedPromo: Promo | null;
+}
+
+export const CartContext = createContext<CartContextType>({ selectedPromo: null });
+
+// Product card component with enhanced interactive design - memoized to prevent unnecessary re-renders
+const ProductCard = React.memo(({ product, onAddToCart, onViewDetails }: { product: SimplifiedProduct; onAddToCart: () => void; onViewDetails: () => void }) => {
+  // Local state for hover effects and animations
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <div 
+      className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 group relative h-full flex flex-col"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Decorative elements */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+      <div className="absolute -bottom-1 -right-1 w-16 h-16 bg-gradient-to-tl from-orange-100 to-transparent rounded-full opacity-0 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"></div>
+      
+      {/* Product image */}
+      <div className="relative h-36 w-full mb-2 bg-gray-100 rounded-lg overflow-hidden cursor-pointer border border-gray-200 hover:border-orange-300 transition-colors">
+        {/* Menampilkan gambar produk jika ada */}
+        {product.image ? (
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            placeholder="blur"
+            blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88P/BfwAIhgOSRKwflwAAAABJRU5ErkJggg=="
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-orange-50">
+            <FaBoxOpen className="text-orange-200" size={48} />
+          </div>
+        )}
+        
+        {/* Detail button with improved styling */}
+        <button 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onViewDetails();
+          }}
+          className="absolute top-2 right-2 p-2 bg-white rounded-full text-gray-500 hover:text-orange-500 border border-gray-200 hover:border-orange-300 shadow-sm hover:shadow-md transition-all duration-200 z-20"
+          title="Lihat detail produk"
+        >
+          <FaInfoCircle size={16} />
+        </button>
+
+        {/* Category badge */}
+        {product.category && (
+          <div className="absolute bottom-2 left-2">
+            <span className="text-xs bg-white bg-opacity-90 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200 shadow-sm">
+              {product.category}
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Product info */}
+      <div className="p-3 flex-1 flex flex-col">
+        <h3 className="font-medium text-gray-800 mb-1.5 line-clamp-2 min-h-[2.5rem] text-sm" title={product.name}>
+          {product.name}
+        </h3>
+        
+        <div className="flex justify-between items-center mb-3 mt-auto">
+          <span className="text-orange-600 font-bold">{formatRupiah(product.price)}</span>
+          <span className="text-xs bg-gradient-to-r from-orange-50 to-orange-100 text-orange-700 px-2 py-0.5 rounded-full border border-orange-200">
+            Stok: {product.stock}
+          </span>
+        </div>
+        
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onAddToCart();
+          }}
+          className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm hover:shadow group-hover:shadow-md"
+          disabled={product.stock <= 0}
+        >
+          {product.stock <= 0 ? (
+            <>
+              <FaBan className="mr-1.5" size={12} />
+              Stok Habis
+            </>
+          ) : (
+            <>
+              <FaPlus className="mr-1.5" size={12} />
+              Tambah ke Keranjang
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+ProductCard.displayName = 'ProductCard';
+
+// Improved cart item component
+const CartItem = ({ item, onUpdateQuantity, onRemove, selectedPromo }: { 
+  item: CartItem; 
+  onUpdateQuantity: (id: string, quantity: number) => void; 
+  onRemove: () => void;
+  selectedPromo: Promo | null;
+}) => {
+  const [localQuantity, setLocalQuantity] = useState(item.quantity);
+  
+  // Sinkronisasi localQuantity dengan item.quantity dari props
+  useEffect(() => {
+    setLocalQuantity(item.quantity);
+  }, [item.quantity]);
+  
+  const handleQuantityChange = useCallback((newQuantity: number) => {
+    if (newQuantity >= 1 && newQuantity <= item.product.stock) {
+      setLocalQuantity(newQuantity);
+      onUpdateQuantity(item.product.id, newQuantity);
+    }
+  }, [item.product.id, item.product.stock, onUpdateQuantity]);
+  
+  // Hitung diskon jika promo ada
+  const discountPercentage = selectedPromo?.discountType === 'percentage' ? selectedPromo.discountValue : 0;
+  const discountAmount = selectedPromo?.discountType === 'fixed' ? selectedPromo.discountValue : 0;
+  
+  // Hitung harga setelah diskon jika ada
+  const priceAfterDiscount = discountPercentage > 0 
+    ? Math.max(0, item.product.price - (item.product.price * (discountPercentage / 100)))
+    : (discountAmount > 0 ? Math.max(0, item.product.price - discountAmount) : item.product.price);
+  
+  return (
+    <div className="flex items-start space-x-3 p-3 bg-white rounded-lg border border-orange-100 shadow-sm hover:shadow-md transition-all mb-2">
+      <div className="relative w-16 h-16 rounded-md overflow-hidden flex-shrink-0 border border-gray-100">
+        {item.product.image ? (
+          <Image
+            src={item.product.image}
+            alt={item.product.name}
+            fill
+            className="object-cover"
+            sizes="64px"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-orange-50">
+            <FaBoxOpen className="text-orange-300" size={24} />
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 min-w-0 flex flex-col justify-between">
+        <div>
+          <h4 className="text-sm font-medium text-gray-800 line-clamp-1">{item.product.name}</h4>
+          <div className="mt-0.5 text-xs text-gray-500">{item.product.category}</div>
+          
+          {/* Tampilkan informasi diskon jika ada */}
+          {(discountPercentage > 0 || discountAmount > 0) && (
+            <div className="flex items-center mt-0.5">
+              <span className="text-xs line-through text-gray-400 mr-1">
+                {formatRupiah(item.product.price)}
+              </span>
+              <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-sm">
+                {discountPercentage > 0 ? `Diskon ${discountPercentage}%` : `Diskon ${formatRupiah(discountAmount)}`}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-between mt-1">
+          <div className="text-orange-600 font-bold">
+            {(discountPercentage > 0 || discountAmount > 0) 
+              ? formatRupiah(priceAfterDiscount)
+              : formatRupiah(item.product.price)
+            }
+            <span className="text-xs text-gray-500 ml-1">x{localQuantity}</span>
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <button 
+                onClick={() => handleQuantityChange(localQuantity - 1)}
+                disabled={localQuantity <= 1}
+                className={`p-1 rounded-l-lg ${localQuantity <= 1 ? 'text-gray-300 bg-gray-50' : 'text-orange-500 hover:bg-orange-50'} transition-colors`}
+              >
+                <FaMinus size={10} />
+              </button>
+              <span className="w-6 text-center text-sm font-medium text-gray-700">{localQuantity}</span>
+              <button 
+                onClick={() => handleQuantityChange(localQuantity + 1)}
+                disabled={localQuantity >= item.product.stock}
+                className={`p-1 rounded-r-lg ${localQuantity >= item.product.stock ? 'text-gray-300 bg-gray-50' : 'text-orange-500 hover:bg-orange-50'} transition-colors`}
+              >
+                <FaPlus size={10} />
+              </button>
+            </div>
+            
+            <button
+              onClick={onRemove}
+              className="text-red-500 hover:text-red-600 transition-colors hover:bg-red-50 p-1.5 rounded-full"
+              aria-label="Hapus produk"
+            >
+              <FaTrash size={12} />
+            </button>
+          </div>
+        </div>
+        
+        {/* Subtotal produk */}
+        <div className="mt-1 text-xs text-right text-gray-500">
+          Subtotal: <span className="font-medium">{formatRupiah((discountPercentage > 0 || discountAmount > 0) ? priceAfterDiscount * localQuantity : item.product.price * localQuantity)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Improved product grid layout
+const ProductGrid = ({ products, onAddToCart, onViewDetails, isLoading }: {
+  products: SimplifiedProduct[];
+  onAddToCart: (product: SimplifiedProduct) => void;
+  onViewDetails: (product: SimplifiedProduct) => void;
+  isLoading: boolean;
+}) => {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 12 }).map((_, index) => (
+          <div key={index} className="bg-white rounded-lg border border-gray-200 p-3 h-[240px] animate-pulse">
+            <div className="w-full h-32 bg-gray-200 rounded-lg mb-3"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
+            <div className="h-8 bg-gray-200 rounded"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+        <div className="p-6 bg-orange-50 rounded-full mb-4 border border-orange-100">
+          <FaSearch className="text-orange-300" size={36} />
+        </div>
+        <p className="text-lg font-medium text-gray-700">Tidak ada produk yang ditemukan</p>
+        <p className="text-sm text-gray-500 mt-1">Coba ubah kata kunci pencarian</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+      {products.map((product) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          onAddToCart={() => onAddToCart(product)}
+          onViewDetails={() => onViewDetails(product)}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Main KasirPage component
+const KasirPage = () => {
+  const { toast } = useToast();
+  const productHook = useProduct();
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [isBarcodeMode, setIsBarcodeMode] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedPromo, setSelectedPromo] = useState<Promo | null>(null);
+  const [newCustomer, setNewCustomer] = useState<Omit<Customer, 'id'>>({
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+  const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<SimplifiedProduct | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'debit' | 'qris' | 'card' | 'ewallet'>('cash');
+  const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [cashAmount, setCashAmount] = useState<string>('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [isCustomerSelectionOpen, setIsCustomerSelectionOpen] = useState(false);
+  const [searchCustomer, setSearchCustomer] = useState("");
+  const [searchPromo, setSearchPromo] = useState("");
+  const [calculatorInput, setCalculatorInput] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [showReceiptOptions, setShowReceiptOptions] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [customerType, setCustomerType] = useState<'existing' | 'new' | 'walkin'>('walkin');
+  const [walkinPhone, setWalkinPhone] = useState('');
+  const [receiptMethod, setReceiptMethod] = useState<'print' | 'whatsapp' | 'email'>('print');
+  
+  // State untuk mengelola proses pembayaran
+  const [paymentStep, setPaymentStep] = useState<'customer' | 'payment' | 'receipt'>('customer');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+  const [existingCustomers, setExistingCustomers] = useState([
+    { id: 1, name: 'John Doe', phone: '081234567890', email: 'john@example.com', address: 'Jl. Sudirman No. 123' },
+    { id: 2, name: 'Jane Smith', phone: '08987654321', email: 'jane@example.com', address: 'Jl. Thamrin No. 456' },
+    { id: 3, name: 'Bob Johnson', phone: '08567891234', email: 'bob@example.com', address: 'Jl. Gatot Subroto No. 789' },
+  ]);
+  const [selectedCustomerData, setSelectedCustomerData] = useState<any>(null);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [receiptOption, setReceiptOption] = useState<'print' | 'whatsapp'>('print');
+  
+  // Mock data untuk pelanggan
+  const mockCustomers: Customer[] = [
+    {
+      id: 1,
+      name: 'Budi Santoso',
+      phone: '081234567890',
+      email: 'budi@example.com',
+      address: 'Jl. Raya No. 123'
+    },
+    {
+      id: 2,
+      name: 'Siti Rahayu',
+      phone: '082345678901',
+      email: 'siti@example.com',
+      address: 'Jl. Raya No. 456'
+    },
+    {
+      id: 3,
+      name: 'Agus Wijaya',
+      phone: '083456789012',
+      email: 'agus@example.com',
+      address: 'Jl. Raya No. 789'
+    },
+    {
+      id: 4,
+      name: 'Dewi Lestari',
+      phone: '084567890123',
+      email: 'dewi@example.com',
+      address: 'Jl. Raya No. 1011'
+    },
+    {
+      id: 5,
+      name: 'Eko Prasetyo',
+      phone: '085678901234',
+      email: 'eko@example.com',
+      address: 'Jl. Raya No. 1213'
+    }
+  ];
+
+  // Filter pelanggan berdasarkan pencarian
+  const filteredCustomers = useMemo(() => {
+    if (!searchCustomer.trim()) {
+      return mockCustomers;
+    }
+    
+    return mockCustomers.filter(customer => 
+      customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
+      customer.phone.includes(searchCustomer) ||
+      (customer.email && customer.email.toLowerCase().includes(searchCustomer.toLowerCase()))
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchCustomer, mockCustomers]);
+
+  useEffect(() => {
+    if (productHook && productHook.products && productHook.products.length > 0) {
+      const uniqueCategories = [...new Set(productHook.products.map(product => product.category))];
+      setCategories(uniqueCategories);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productHook, productHook?.products]);
+
+  // Mock data untuk promos
+  const [promos, setPromos] = useState<Promo[]>([
+    { id: 1, name: 'Welcome 10%', description: 'Diskon 10% untuk pembelian pertama', discountType: 'percentage', discountValue: 10, minPurchase: 50000, startDate: '2024-01-01', endDate: '2024-01-31' },
+    { id: 2, name: 'FarMax 25', description: 'Potongan Rp 25.000 untuk pembelian di atas Rp 100.000', discountType: 'fixed', discountValue: 25000, minPurchase: 100000, startDate: '2024-02-01', endDate: '2024-02-28' },
+    { id: 3, name: 'Obat 15%', description: 'Diskon 15% untuk pembelian obat', discountType: 'percentage', discountValue: 15, minPurchase: 75000, startDate: '2024-03-01', endDate: '2024-03-31' },
+    { id: 4, name: 'Vitamin 20%', description: 'Diskon 20% untuk pembelian vitamin', discountType: 'percentage', discountValue: 20, minPurchase: 150000, startDate: '2024-04-01', endDate: '2024-04-30' },
+  ]);
+
+  // Filter products based on search query and category
+  const filteredProducts = useMemo(() => {
+    // Pastikan productHook tidak undefined
+    if (!productHook || !productHook.products) {
+      // Jika productHook.products belum tersedia, tampilkan produk dummy
+      return [
+        {
+          id: 'dummy1',
+          name: 'Paracetamol 500mg',
+          price: 15000,
+          category: 'Analgesik',
+          image: 'https://i.imgur.com/JQpMvmD.jpg',
+          stock: 100,
+          description: 'Obat pereda nyeri dan penurun demam',
+          location: 'Rak A-1',
+          expiry: '2025-12-31',
+          manufacturer: 'PT. Kimia Farma',
+          batch: 'BT2023001'
+        },
+        {
+          id: 'dummy2',
+          name: 'Masker Medis (50pcs)',
+          price: 50000,
+          category: 'Alat Kesehatan',
+          image: 'https://i.imgur.com/0K3f8W3.jpg',
+          stock: 30,
+          description: 'Masker sekali pakai untuk perlindungan kesehatan',
+          location: 'Rak F-1',
+          expiry: '2027-01-01',
+          manufacturer: 'PT. Surgika Alkesindo',
+          batch: 'BT2023002'
+        },
+        {
+          id: 'dummy3',
+          name: 'Betadine 60ml',
+          price: 28000,
+          category: 'Antiseptik',
+          image: 'https://i.imgur.com/9G8S86l.jpg',
+          stock: 40,
+          description: 'Antiseptik untuk membersihkan luka',
+          location: 'Rak F-2',
+          expiry: '2026-05-10',
+          manufacturer: 'PT. Mahakam Beta Farma',
+          batch: 'BT2023003'
+        },
+        {
+          id: 'dummy4',
+          name: 'Plester Luka (20pcs)',
+          price: 15000,
+          category: 'Alat Kesehatan',
+          image: 'https://i.imgur.com/JzULzmP.jpg',
+          stock: 50,
+          description: 'Plester untuk menutup luka kecil',
+          location: 'Rak F-3',
+          expiry: '2027-03-15',
+          manufacturer: 'PT. Hisamitsu Pharma',
+          batch: 'BT2023004'
+        },
+        {
+          id: 'dummy5',
+          name: 'Minyak Kayu Putih 60ml',
+          price: 32000,
+          category: 'Herbal',
+          image: 'https://i.imgur.com/1LYzPnG.jpg',
+          stock: 35,
+          description: 'Minyak esensial untuk meredakan gejala flu dan nyeri otot',
+          location: 'Rak G-1',
+          expiry: '2026-08-20',
+          manufacturer: 'PT. Eagle Indo Pharma',
+          batch: 'BT2023005'
+        },
+        {
+          id: 'dummy6',
+          name: 'Thermometer Digital',
+          price: 85000,
+          category: 'Alat Kesehatan',
+          image: 'https://i.imgur.com/8JKz7p4.jpg',
+          stock: 20,
+          description: 'Alat pengukur suhu tubuh digital dengan akurasi tinggi',
+          location: 'Rak G-2',
+          expiry: '2030-01-01',
+          manufacturer: 'PT. Omron Healthcare',
+          batch: 'BT2023006'
+        },
+        {
+          id: 'dummy7',
+          name: 'Tensimeter Digital',
+          price: 350000,
+          category: 'Alat Kesehatan',
+          image: 'https://i.imgur.com/KgTGxWX.jpg',
+          stock: 10,
+          description: 'Alat pengukur tekanan darah otomatis',
+          location: 'Rak G-3',
+          expiry: '2030-01-01',
+          manufacturer: 'PT. Omron Healthcare',
+          batch: 'BT2023007'
+        },
+        {
+          id: 'dummy8',
+          name: 'Multivitamin Harian',
+          price: 75000,
+          category: 'Vitamin',
+          image: 'https://i.imgur.com/rNUCMjH.jpg',
+          stock: 40,
+          description: 'Suplemen multivitamin untuk menjaga kesehatan tubuh',
+          location: 'Rak C-2',
+          expiry: '2026-04-15',
+          manufacturer: 'PT. Kalbe Farma',
+          batch: 'BT2023008'
+        }
+      ];
+    }
+    
+    // Extract unique categories for the category filter dropdown
+    const uniqueCategories = Array.isArray(productHook.products) ? [...new Set(productHook.products.map(product => product.category))] : [];
+    setCategories(uniqueCategories);
+    
+    return productHook.products.filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "" || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productHook, productHook?.products, searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    // Pastikan productHook.products sudah dimuat
+    if (productHook && productHook.products && productHook.products.length > 0) {
+      // Pilih beberapa produk untuk ditambahkan ke keranjang sebagai contoh
+      const dummyCartItems: CartItem[] = [
+        {
+          product: {
+            id: '1',
+            name: 'Paracetamol 500mg',
+            price: 15000,
+            category: 'Analgesik',
+            image: 'https://i.imgur.com/JQpMvmD.jpg',
+            stock: 100,
+            description: 'Obat pereda nyeri dan penurun demam'
+          },
+          quantity: 2,
+          subtotal: 30000
+        },
+        {
+          product: {
+            id: '7',
+            name: 'Masker Medis (50pcs)',
+            price: 50000,
+            category: 'Alat Kesehatan',
+            image: 'https://i.imgur.com/0K3f8W3.jpg',
+            stock: 30,
+            description: 'Masker sekali pakai untuk perlindungan kesehatan'
+          },
+          quantity: 1,
+          subtotal: 50000
+        },
+        {
+          product: {
+            id: '10',
+            name: 'Minyak Kayu Putih 60ml',
+            price: 32000,
+            category: 'Herbal',
+            image: 'https://i.imgur.com/1LYzPnG.jpg',
+            stock: 35,
+            description: 'Minyak esensial untuk meredakan gejala flu dan nyeri otot'
+          },
+          quantity: 1,
+          subtotal: 32000
+        },
+        {
+          product: {
+            id: '13',
+            name: 'Multivitamin Harian',
+            price: 75000,
+            category: 'Vitamin',
+            image: 'https://i.imgur.com/rNUCMjH.jpg',
+            stock: 40,
+            description: 'Suplemen multivitamin untuk menjaga kesehatan tubuh'
+          },
+          quantity: 1,
+          subtotal: 75000
+        }
+      ];
+      
+      // Set cart dengan produk dummy
+      setCart(dummyCartItems);
+      
+      // Set customer default
+      setSelectedCustomer(mockCustomers[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productHook, productHook?.products]);
+
+  // Función para calcular el subtotal
+  const calculateSubtotal = () => {
+    return cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  };
+
+  // Función para calcular el descuento
+  const calculateDiscount = () => {
+    if (!selectedPromo) return 0;
+    
+    const subtotal = calculateSubtotal();
+    
+    // Verificar si cumple con la compra mínima
+    if (subtotal < selectedPromo.minPurchase) return 0;
+    
+    // Calcular descuento según el tipo
+    if (selectedPromo.discountType === 'percentage') {
+      return subtotal * (selectedPromo.discountValue / 100);
+    } else {
+      // Descuento de valor fijo
+      return selectedPromo.discountValue;
+    }
+  };
+
+  // Función para calcular el impuesto
+  const calculateTax = () => {
+    return (calculateSubtotal() - calculateDiscount()) * 0.11; // 11% tax
+  };
+
+  // Función para calcular el total
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const discount = calculateDiscount();
+    const ppn = (subtotal - discount) * 0.11;
+    return subtotal - discount + ppn;
+  };
+
+  // Fungsi untuk manejar el proceso de pago
+  const handlePaymentProcess = () => {
+    if (paymentMethod === 'cash' && amountPaid < calculateTotal()) {
+      toast({
+        title: "Pembayaran Gagal",
+        description: "Jumlah uang tidak mencukupi",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Mulai proses pembayaran
+    setPaymentStatus('processing');
+    setIsPaymentProcessing(true);
+    
+    // Simulasi proses pembayaran (dalam aplikasi nyata, ini akan memanggil API)
+    setTimeout(() => {
+      setIsPaymentProcessing(false);
+      setPaymentStatus('success');
+      
+      toast({
+        title: "Pembayaran Berhasil",
+        description: "Transaksi telah berhasil diproses",
+        variant: "default",
+      });
+      
+      // Tampilkan opsi cetak struk
+      setShowReceiptOptions(true);
+    }, 2000);
+  };
+
+  // Función para manejar los botones de cantidad rápida
+  const handleQuickAmount = (amount: number) => {
+    setCalculatorInput(amount.toString());
+    setAmountPaid(amount);
+  };
+
+  // Función para manejar la entrada de la calculadora
+  const handleCalculatorInput = (value: string) => {
+    if (value === 'C') {
+      // Clear input
+      setCalculatorInput('');
+      setAmountPaid(0);
+    } else if (value === '⌫') {
+      // Backspace
+      if (calculatorInput.length > 0) {
+        const newInput = calculatorInput.slice(0, -1);
+        setCalculatorInput(newInput);
+        setAmountPaid(newInput ? parseInt(newInput) : 0);
+      }
+    } else if (value === '=') {
+      // Calculate
+      try {
+        const result = eval(calculatorInput);
+        setCalculatorInput(result.toString());
+        setAmountPaid(result);
+      } catch (error) {
+        toast({
+          title: "Kesalahan Kalkulasi",
+          description: "Input tidak valid",
+          variant: "destructive"
+        });
+      }
+    } else if (value === '00') {
+      // Add double zeros
+      const newInput = calculatorInput + '00';
+      setCalculatorInput(newInput);
+      
+      // If it's a simple number, update amountPaid
+      if (/^\d+$/.test(newInput)) {
+        setAmountPaid(parseInt(newInput));
+      }
+    } else {
+      // Add digit or operator
+      const newInput = calculatorInput + value;
+      setCalculatorInput(newInput);
+      
+      // If it's a simple number, update amountPaid
+      if (/^\d+$/.test(newInput)) {
+        setAmountPaid(parseInt(newInput));
+      }
+    }
+  };
+
+  // Fungsi untuk mencetak struk
+  const handlePrintReceipt = () => {
+    toast({
+      title: "Struk Berhasil Dicetak",
+      description: "Transaksi selesai",
+      variant: "default",
+    });
+  };
+  
+  // Fungsi untuk mengirim struk via WhatsApp
+  const handleSendWhatsApp = () => {
+    if (!selectedCustomerData?.phone) {
+      toast({
+        title: "Nomor WhatsApp Tidak Tersedia",
+        description: "Pelanggan tidak memiliki nomor telepon",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Struk Dikirim via WhatsApp",
+      description: `Struk telah dikirim ke ${selectedCustomerData.phone}`,
+      variant: "default",
+    });
+  };
+  
+  // Fungsi untuk mengirim struk via email
+  const handleSendEmail = () => {
+    if (!selectedCustomerData?.email) {
+      toast({
+        title: "Email Tidak Tersedia",
+        description: "Pelanggan tidak memiliki alamat email",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Struk Dikirim via Email",
+      description: `Struk telah dikirim ke ${selectedCustomerData.email}`,
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk cerrar el modal de pago y resetear el estado
+  const handleClosePaymentAndReset = () => {
+    setShowReceiptOptions(false);
+    setIsPaymentModalOpen(false);
+    setPaymentStatus('idle');
+    setCart([]);
+    setSelectedPromo(null);
+    setAmountPaid(0);
+    setCalculatorInput('');
+    setPaymentMethod('cash');
+  };
+
+  // Fungsi untuk manejar el pago completo
+  const handlePaymentComplete = () => {
+    // Reset state
+    setCart([]);
+    setSelectedPromo(null);
+    setSelectedCustomer(null);
+    setIsPaymentModalOpen(false);
+    setPaymentStatus('idle');
+    setShowReceiptOptions(false);
+    
+    toast({
+      title: "Transaksi Selesai",
+      description: "Terima kasih telah berbelanja",
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk abrir el modal de pago
+  const openPaymentModal = () => {
+    setAmountPaid(0);
+    setCalculatorInput('');
+    setPaymentMethod('cash');
+    setPaymentStatus('idle');
+    setShowReceiptOptions(false);
+    setIsPaymentModalOpen(true);
+  };
+
+  // Fungsi untuk manejar el proceso de pago
+  const handlePayment = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Keranjang Kosong",
+        description: "Tambahkan produk ke keranjang terlebih dahulu",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Jika pelanggan belum dipilih, buka modal pemilihan pelanggan terlebih dahulu
+    if (!selectedCustomer) {
+      setIsCustomerSelectionOpen(true);
+    } else {
+      // Jika pelanggan sudah dipilih, langsung buka modal pembayaran
+      openPaymentModal();
+    }
+  };
+
+  // Fungsi untuk menambahkan produk ke keranjang
+  const handleAddToCart = (product: SimplifiedProduct) => {
+    // Cek apakah produk sudah ada di keranjang
+    const existingItemIndex = cart.findIndex(item => item.product.id === product.id);
+    
+    if (existingItemIndex !== -1) {
+      // Jika sudah ada, tambahkan quantity
+      const updatedCart = [...cart];
+      const newQuantity = updatedCart[existingItemIndex].quantity + 1;
+      
+      // Pastikan tidak melebihi stok yang tersedia
+      if (newQuantity <= product.stock) {
+        updatedCart[existingItemIndex] = {
+          ...updatedCart[existingItemIndex],
+          quantity: newQuantity,
+          subtotal: product.price * newQuantity
+        };
+        setCart(updatedCart);
+        
+        toast({
+          title: "Produk Ditambahkan",
+          description: `${product.name} ditambahkan ke keranjang (${newQuantity}x)`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Stok Tidak Cukup",
+          description: `Hanya tersedia ${product.stock} unit untuk produk ini`,
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Jika belum ada, tambahkan item baru
+      setCart([
+        ...cart, 
+        { 
+          product, 
+          quantity: 1,
+          subtotal: product.price
+        }
+      ]);
+      
+      toast({
+        title: "Produk Ditambahkan",
+        description: `${product.name} telah ditambahkan ke keranjang`,
+        variant: "default",
+      });
+    }
+  };
+
+  // Fungsi untuk mengupdate quantity produk di keranjang
+  const handleUpdateQuantity = (productId: string, quantity: number) => {
+    const updatedCart = cart.map(item => 
+      item.product.id === productId 
+        ? { ...item, quantity } 
+        : item
+    );
+    setCart(updatedCart);
+  };
+
+  // Fungsi untuk menghapus produk dari keranjang
+  const handleRemoveFromCart = (productId: string) => {
+    const updatedCart = cart.filter(item => item.product.id !== productId);
+    setCart(updatedCart);
+    toast({
+      title: "Produk Dihapus",
+      description: "Produk telah dihapus dari keranjang",
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk melihat detail produk
+  const handleViewDetails = (product: SimplifiedProduct) => {
+    setSelectedProduct(product);
+    setIsProductDetailModalOpen(true);
+  };
+
+  // Fungsi untuk menangani keydown pada input barcode
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && barcodeInput.trim()) {
+      // Cari produk berdasarkan barcode (di implementasi nyata, ini akan mencari berdasarkan kode produk)
+      const product = productHook.products?.find(p => p.id === barcodeInput.trim());
+      
+      if (product) {
+        handleAddToCart(product);
+        setBarcodeInput('');
+      } else {
+        toast({
+          title: "Produk Tidak Ditemukan",
+          description: "Barcode tidak cocok dengan produk manapun",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Fungsi untuk menangani penambahan pelanggan baru
+  const handleNewCustomer = () => {
+    if (!newCustomerForm.name || !newCustomerForm.phone) {
+      toast({
+        title: "Data Tidak Lengkap",
+        description: "Nama dan nomor telepon wajib diisi",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Buat ID baru (dalam aplikasi nyata, ini akan dari API)
+    const id = existingCustomers.length + 1;
+    
+    // Buat objek pelanggan baru
+    const customer: Customer = {
+      id,
+      ...newCustomerForm
+    };
+    
+    // Tambahkan ke daftar pelanggan
+    setExistingCustomers([...existingCustomers, customer]);
+    
+    // Pilih pelanggan baru sebagai pelanggan aktif
+    setSelectedCustomerData(customer);
+    
+    // Reset form
+    setNewCustomerForm({
+      name: '',
+      phone: '',
+      email: '',
+      address: ''
+    });
+    
+    // Pindah ke langkah berikutnya
+    setPaymentStep('payment');
+    
+    toast({
+      title: "Pelanggan Baru Ditambahkan",
+      description: `${customer.name} berhasil ditambahkan`,
+      variant: "default",
+    });
+  };
+
+  const handleOpenPromoModal = () => {
+    setIsPromoModalOpen(true);
+  };
+
+  // State untuk menandai auto promo sudah dijalankan
+  const [autoPromoApplied, setAutoPromoApplied] = useState(false);
+
+  // Hook untuk mengecek promo yang tersedia otomatis
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hanya jalankan jika keranjang tidak kosong, promo belum dipilih, dan auto promo belum dijalankan
+    if (cart.length > 0 && !selectedPromo && promos.length > 0 && !autoPromoApplied) {
+      // Hitung total belanja
+      const subtotal = calculateSubtotal();
+      
+      // Temukan promo yang cocok dengan total belanja
+      const eligiblePromos = promos.filter(promo => subtotal >= promo.minPurchase);
+      
+      if (eligiblePromos.length > 0) {
+        // Pilih promo dengan nilai diskon tertinggi
+        const bestPromo = eligiblePromos.reduce((best, current) => {
+          // Konversi ke nilai diskon sebenarnya
+          const bestDiscount = best.discountType === 'percentage' 
+            ? subtotal * (best.discountValue / 100) 
+            : best.discountValue;
+            
+          const currentDiscount = current.discountType === 'percentage' 
+            ? subtotal * (current.discountValue / 100) 
+            : current.discountValue;
+            
+          return currentDiscount > bestDiscount ? current : best;
+        }, eligiblePromos[0]);
+        
+        // Tandai bahwa auto promo sudah dijalankan
+        setAutoPromoApplied(true);
+        setSelectedPromo(bestPromo);
+        
+        toast({
+          title: "Promo Otomatis Diterapkan",
+          description: `${bestPromo.name} telah diterapkan pada transaksi ini`,
+          variant: "default",
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, selectedPromo, promos, autoPromoApplied]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Reset autoPromoApplied saat keranjang kosong atau promo dihapus
+    if (cart.length === 0 || !selectedPromo) {
+      setAutoPromoApplied(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.length, selectedPromo]);
+
+  // Fungsi untuk manejar el proceso de pago
+      });
+      
+      // Tampilkan opsi cetak struk
+      setShowReceiptOptions(true);
+    }, 2000);
+  };
+
+  // Función para manejar los botones de cantidad rápida
+  const handleQuickAmount = (amount: number) => {
+    setCalculatorInput(amount.toString());
+    setAmountPaid(amount);
+  };
+
+  // Función para manejar la entrada de la calculadora
+  const handleCalculatorInput = (value: string) => {
+    if (value === 'C') {
+      // Clear input
+      setCalculatorInput('');
+      setAmountPaid(0);
+    } else if (value === '⌫') {
+      // Backspace
+      if (calculatorInput.length > 0) {
+        const newInput = calculatorInput.slice(0, -1);
+        setCalculatorInput(newInput);
+        setAmountPaid(newInput ? parseInt(newInput) : 0);
+      }
+    } else if (value === '=') {
+      // Calculate
+      try {
+        const result = eval(calculatorInput);
+        setCalculatorInput(result.toString());
+        setAmountPaid(result);
+      } catch (error) {
+        toast({
+          title: "Kesalahan Kalkulasi",
+          description: "Input tidak valid",
+          variant: "destructive"
+        });
+      }
+    } else if (value === '00') {
+      // Add double zeros
+      const newInput = calculatorInput + '00';
+      setCalculatorInput(newInput);
+      
+      // If it's a simple number, update amountPaid
+      if (/^\d+$/.test(newInput)) {
+        setAmountPaid(parseInt(newInput));
+      }
+    } else {
+      // Add digit or operator
+      const newInput = calculatorInput + value;
+      setCalculatorInput(newInput);
+      
+      // If it's a simple number, update amountPaid
+      if (/^\d+$/.test(newInput)) {
+        setAmountPaid(parseInt(newInput));
+      }
+    }
+  };
+
+  // Fungsi untuk mencetak struk
+  const handlePrintReceipt = () => {
+    toast({
+      title: "Struk Berhasil Dicetak",
+      description: "Transaksi selesai",
+      variant: "default",
+    });
+  };
+  
+  // Fungsi untuk mengirim struk via WhatsApp
+  const handleSendWhatsApp = () => {
+    if (!selectedCustomerData?.phone) {
+      toast({
+        title: "Nomor WhatsApp Tidak Tersedia",
+        description: "Pelanggan tidak memiliki nomor telepon",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Struk Dikirim via WhatsApp",
+      description: `Struk telah dikirim ke ${selectedCustomerData.phone}`,
+      variant: "default",
+    });
+  };
+  
+  // Fungsi untuk mengirim struk via email
+  const handleSendEmail = () => {
+    if (!selectedCustomerData?.email) {
+      toast({
+        title: "Email Tidak Tersedia",
+        description: "Pelanggan tidak memiliki alamat email",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Struk Dikirim via Email",
+      description: `Struk telah dikirim ke ${selectedCustomerData.email}`,
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk cerrar el modal de pago y resetear el estado
+  const handleClosePaymentAndReset = () => {
+    setShowReceiptOptions(false);
+    setIsPaymentModalOpen(false);
+    setPaymentStatus('idle');
+    setCart([]);
+    setSelectedPromo(null);
+    setAmountPaid(0);
+    setCalculatorInput('');
+    setPaymentMethod('cash');
+  };
+
+  // Fungsi untuk manejar el pago completo
+  const handlePaymentComplete = () => {
+    // Reset state
+    setCart([]);
+    setSelectedPromo(null);
+    setSelectedCustomer(null);
+    setIsPaymentModalOpen(false);
+    setPaymentStatus('idle');
+    setShowReceiptOptions(false);
+    
+    toast({
+      title: "Transaksi Selesai",
+      description: "Terima kasih telah berbelanja",
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk abrir el modal de pago
+  const openPaymentModal = () => {
+    setAmountPaid(0);
+    setCalculatorInput('');
+    setPaymentMethod('cash');
+    setPaymentStatus('idle');
+    setShowReceiptOptions(false);
+    setIsPaymentModalOpen(true);
+  };
+
+  // Fungsi untuk manejar el proceso de pago
+  const handlePayment = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Keranjang Kosong",
+        description: "Tambahkan produk ke keranjang terlebih dahulu",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Jika pelanggan belum dipilih, buka modal pemilihan pelanggan terlebih dahulu
+    if (!selectedCustomer) {
+      setIsCustomerSelectionOpen(true);
+    } else {
+      // Jika pelanggan sudah dipilih, langsung buka modal pembayaran
+      openPaymentModal();
+    }
+  };
+
+  // Fungsi untuk menambahkan produk ke keranjang
+  const handleAddToCart = (product: SimplifiedProduct) => {
+    // Cek apakah produk sudah ada di keranjang
+    const existingItemIndex = cart.findIndex(item => item.product.id === product.id);
+    
+    if (existingItemIndex !== -1) {
+      // Jika sudah ada, tambahkan quantity
+      const updatedCart = [...cart];
+      const newQuantity = updatedCart[existingItemIndex].quantity + 1;
+      
+      // Pastikan tidak melebihi stok yang tersedia
+      if (newQuantity <= product.stock) {
+        updatedCart[existingItemIndex] = {
+          ...updatedCart[existingItemIndex],
+          quantity: newQuantity,
+          subtotal: product.price * newQuantity
+        };
+        setCart(updatedCart);
+        
+        toast({
+          title: "Produk Ditambahkan",
+          description: `${product.name} ditambahkan ke keranjang (${newQuantity}x)`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Stok Tidak Cukup",
+          description: `Hanya tersedia ${product.stock} unit untuk produk ini`,
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Jika belum ada, tambahkan item baru
+      setCart([
+        ...cart, 
+        { 
+          product, 
+          quantity: 1,
+          subtotal: product.price
+        }
+      ]);
+      
+      toast({
+        title: "Produk Ditambahkan",
+        description: `${product.name} telah ditambahkan ke keranjang`,
+        variant: "default",
+      });
+    }
+  };
+
+  // Fungsi untuk mengupdate quantity produk di keranjang
+  const handleUpdateQuantity = (productId: string, quantity: number) => {
+    const updatedCart = cart.map(item => 
+      item.product.id === productId 
+        ? { ...item, quantity } 
+        : item
+    );
+    setCart(updatedCart);
+  };
+
+  // Fungsi untuk menghapus produk dari keranjang
+  const handleRemoveFromCart = (productId: string) => {
+    const updatedCart = cart.filter(item => item.product.id !== productId);
+    setCart(updatedCart);
+    toast({
+      title: "Produk Dihapus",
+      description: "Produk telah dihapus dari keranjang",
+      variant: "default",
+    });
+  };
+
+  // Fungsi untuk melihat detail produk
+  const handleViewDetails = (product: SimplifiedProduct) => {
+    setSelectedProduct(product);
+    setIsProductDetailModalOpen(true);
+  };
+
+  // Fungsi untuk menangani keydown pada input barcode
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && barcodeInput.trim()) {
+      // Cari produk berdasarkan barcode (di implementasi nyata, ini akan mencari berdasarkan kode produk)
+      const product = productHook.products?.find(p => p.id === barcodeInput.trim());
+      
+      if (product) {
+        handleAddToCart(product);
+        setBarcodeInput('');
+      } else {
+        toast({
+          title: "Produk Tidak Ditemukan",
+          description: "Barcode tidak cocok dengan produk manapun",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Fungsi untuk menangani penambahan pelanggan baru
+  const handleNewCustomer = () => {
+    if (!newCustomerForm.name || !newCustomerForm.phone) {
+      toast({
+        title: "Data Tidak Lengkap",
+        description: "Nama dan nomor telepon wajib diisi",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Buat ID baru (dalam aplikasi nyata, ini akan dari API)
+    const id = existingCustomers.length + 1;
+    
+    // Buat objek pelanggan baru
+    const customer: Customer = {
+      id,
+      ...newCustomerForm
+    };
+    
+    // Tambahkan ke daftar pelanggan
+    setExistingCustomers([...existingCustomers, customer]);
+    
+    // Pilih pelanggan baru sebagai pelanggan aktif
+    setSelectedCustomerData(customer);
+    
+    // Reset form
+    setNewCustomerForm({
+      name: '',
+      phone: '',
+      email: '',
+      address: ''
+    });
+    
+    // Pindah ke langkah berikutnya
+    setPaymentStep('payment');
+    
+    toast({
+      title: "Pelanggan Baru Ditambahkan",
+      description: `${customer.name} berhasil ditambahkan`,
+      variant: "default",
+    });
+  };
+
+  const handleOpenPromoModal = () => {
+    setIsPromoModalOpen(true);
+  };
+
+  // State untuk menandai auto promo sudah dijalankan
+  const [autoPromoApplied, setAutoPromoApplied] = useState(false);
+
+  // Hook untuk mengecek promo yang tersedia otomatis
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hanya jalankan jika keranjang tidak kosong, promo belum dipilih, dan auto promo belum dijalankan
+    if (cart.length > 0 && !selectedPromo && promos.length > 0 && !autoPromoApplied) {
+      // Hitung total belanja
+      const subtotal = calculateSubtotal();
+      
+      // Temukan promo yang cocok dengan total belanja
+      const eligiblePromos = promos.filter(promo => subtotal >= promo.minPurchase);
+      
+      if (eligiblePromos.length > 0) {
+        // Pilih promo dengan nilai diskon tertinggi
+        const bestPromo = eligiblePromos.reduce((best, current) => {
+          // Konversi ke nilai diskon sebenarnya
+          const bestDiscount = best.discountType === 'percentage' 
+            ? subtotal * (best.discountValue / 100) 
+            : best.discountValue;
+            
+          const currentDiscount = current.discountType === 'percentage' 
+            ? subtotal * (current.discountValue / 100) 
+            : current.discountValue;
+            
+          return currentDiscount > bestDiscount ? current : best;
+        }, eligiblePromos[0]);
+        
+        // Tandai bahwa auto promo sudah dijalankan
+        setAutoPromoApplied(true);
+        setSelectedPromo(bestPromo);
+        
+        toast({
+          title: "Promo Otomatis Diterapkan",
+          description: `${bestPromo.name} telah diterapkan pada transaksi ini`,
+          variant: "default",
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, selectedPromo, promos, autoPromoApplied]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Reset autoPromoApplied saat keranjang kosong atau promo dihapus
+    if (cart.length === 0 || !selectedPromo) {
+      setAutoPromoApplied(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.length, selectedPromo]);
+
+  // Fungsi untuk memulai proses pembayaran
+  const handlePayment = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Keranjang Kosong",
+        description: "Tambahkan produk ke keranjang terlebih dahulu",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Jika pelanggan belum dipilih, buka modal pemilihan pelanggan terlebih dahulu
+    if (!selectedCustomer) {
+      setPaymentStep('customer');
+      setCustomerType('walkin');
+      setSelectedCustomerData(null);
+      setIsPaymentModalOpen(true);
+    } else {
+      // Jika pelanggan sudah dipilih, langsung buka modal pembayaran
+      setPaymentStep('payment');
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  // Fungsi untuk melanjutkan ke langkah berikutnya
+  const handleNextStep = () => {
+    if (paymentStep === 'customer') {
+      setPaymentStep('payment');
+    } else if (paymentStep === 'payment') {
+      // Simulasi proses pembayaran
+      setIsPaymentProcessing(true);
+      setTimeout(() => {
+        setIsPaymentProcessing(false);
+        setIsPaymentModalOpen(false);
+        setIsReceiptModalOpen(true);
+        setPaymentStep('receipt');
+      }, 1500);
+    } else if (paymentStep === 'receipt') {
+      if (receiptOption === 'print') {
+        // Simulasi cetak struk
+        toast({
+          title: "Struk Berhasil Dicetak",
+          description: "Transaksi selesai",
+          variant: "default",
+        });
+      } else if (receiptOption === 'whatsapp') {
+        // Simulasi kirim via WhatsApp
+        toast({
+          title: "Struk Dikirim via WhatsApp",
+          description: `Struk telah dikirim ke ${whatsappNumber || selectedCustomerData?.phone || 'pelanggan'}`,
+          variant: "default",
+        });
+      }
+      
+      // Reset state
+      setIsReceiptModalOpen(false);
+      setCart([]);
+      setSelectedPromo(null);
+      setCustomerType('walkin');
+      setPaymentStep('customer');
+      setReceiptOption('print');
+    }
+  };
+  
+  // Fungsi untuk handle pilihan customer
+  const handleCustomerTypeChange = (type: 'walkin' | 'existing' | 'new') => {
+    setCustomerType(type);
+    if (type === 'walkin') {
+      setSelectedCustomerData(null);
+    }
+  };
+  
+  // Fungsi untuk memilih customer yang sudah ada
+  const handleSelectCustomer = (customer: any) => {
+    setSelectedCustomerData(customer);
+    setIsCustomerSelectionOpen(false);
+    setPaymentStep('payment');
+  };
+  
+  // Fungsi untuk handle input data customer baru
+  const handleNewCustomerInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewCustomerForm({
+      ...newCustomerForm,
+      [name]: value
+    });
+  };
+  
+  // Fungsi untuk menambahkan customer baru
+  const handleAddNewCustomer = () => {
+    const newCustomer = {
+      id: existingCustomers.length + 1,
+      ...newCustomerForm
+    };
+    setExistingCustomers([...existingCustomers, newCustomer]);
+    setSelectedCustomerData(newCustomer);
+    toast({
+      title: "Customer Baru Ditambahkan",
+      description: `${newCustomerForm.name} berhasil ditambahkan`,
+      variant: "default",
+    });
+  };
+  
+  // Fungsi untuk filter customer berdasarkan kata kunci
+  const paymentFilteredCustomers = useMemo(() => {
+    if (!customerSearchQuery) return existingCustomers;
+    return existingCustomers.filter(
+      customer => 
+        customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+        customer.phone.includes(customerSearchQuery)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingCustomers, customerSearchQuery]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Set customer data jika ada
+    if (customerType === 'existing' && existingCustomers.length > 0) {
+      // Default select customer pertama dalam daftar mock
+      setSelectedCustomerData(mockCustomers[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerType, existingCustomers.length, mockCustomers]);
+
+  // Fungsi untuk kembali ke langkah sebelumnya dalam modal pembayaran
+  const handlePrevStep = () => {
+    if (paymentStep === 'payment') {
+      setPaymentStep('customer');
+    } else if (paymentStep === 'receipt') {
+      setPaymentStep('payment');
+    }
+  };
+
+  return (
+    <PosLayout>
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Left side - Products */}
+          <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Header with back button and title */}
+            <div className="bg-white border-b border-gray-100 sticky top-0 z-30">
+              <div className="p-4 flex items-center justify-between">
+                {/* Back button */}
+                <Link href="/pos" className="mr-4">
+                  <button className="flex items-center justify-center p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200">
+                    <FaArrowLeft size={16} />
+                  </button>
+                </Link>
+                
+                <div className="flex-1">
+                  <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight flex items-center">
+                    <span className="bg-gradient-to-br from-orange-600 to-orange-500 text-white p-1.5 rounded-lg mr-2 shadow-md">
+                      <FaCashRegister size={20} />
+                    </span>
+                    Kasir
+                    <span className="ml-2 text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">v1.0</span>
+                  </h1>
+                </div>
+                
+                {/* Customer and barcode buttons */}
+                <button
+                  onClick={() => setIsBarcodeMode(!isBarcodeMode)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 shadow-sm ${
+                    isBarcodeMode 
+                      ? 'bg-orange-500 text-white border border-orange-600'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-200 text-gray-600'
+                    }`}
+                >
+                  <FaBarcode size={18} />
+                  <span>Scanner Barcode</span>
+                </button>
+                
+                {selectedCustomer && (
+                  <div className="ml-2 flex items-center space-x-2 px-4 py-2 rounded-lg text-sm bg-green-50 border border-green-200 text-green-700">
+                    <FaUser size={14} />
+                    <span className="font-medium">{selectedCustomer.name}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Barcode scanner input */}
+              {isBarcodeMode && (
+                <div className="mx-4 mb-4 bg-orange-50 p-3 rounded-lg border border-orange-100 animate-fadeIn">
+                <div className="flex items-center">
+                  <div className="mr-3 text-orange-500">
+                    <FaBarcode size={24} />
+                  </div>
+                  <input
+                    type="text"
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onKeyDown={handleBarcodeKeyDown}
+                    placeholder="Scan atau masukkan kode barcode..."
+                    className="w-full border-2 border-orange-200 focus:border-orange-400 rounded-lg px-4 py-2 text-gray-700 focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              )}
+              
+              {/* Search and filter */}
+              <div className="p-4 bg-gray-50 border-t border-b border-gray-100">
+                <div className="flex space-x-3 mb-3">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                      <FaSearch size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Cari produk..."
+                      className="pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-orange-400"
+                    />
+                  </div>
+                  
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="border border-gray-200 focus:border-orange-400 rounded-lg px-4 py-2.5 text-gray-700 focus:outline-none bg-white"
+                  >
+                    <option value="">Semua Kategori</option>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {(searchQuery || selectedCategory) && (
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-gray-500">
+                      Menampilkan {filteredProducts.length} produk
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSelectedCategory('');
+                      }}
+                      className="text-xs text-orange-600 hover:text-orange-700 font-medium flex items-center"
+                    >
+                      <FaTimes size={10} /> Reset Filter
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Products grid */}
+            <div className="p-4 bg-gray-50 min-h-[400px]">
+              <ProductGrid
+                products={filteredProducts}
+                onAddToCart={handleAddToCart}
+                onViewDetails={handleViewDetails}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
+          
+          {/* Right side - Cart */}
+          <div className="lg:w-[380px] bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+            {/* Cart header */}
+            <div className="p-4 border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-bold text-gray-800 flex items-center">
+                  <FaShoppingCart className="mr-2 text-orange-500" />
+                  Keranjang Belanja
+                </h2>
+                <div className="flex items-center bg-orange-100 px-3 py-1 rounded-full">
+                  <span className="text-sm font-medium text-orange-600">
+                    {cart.length} item
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Cart items */}
+            <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: 'calc(4 * 94px)' }}>
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <div className="p-6 bg-orange-50 rounded-full mb-4 border border-orange-100">
+                    <FaShoppingCart className="text-orange-200" size={32} />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">Keranjang belanja kosong</p>
+                  <p className="text-xs text-gray-500 mt-1">Tambahkan produk untuk memulai transaksi</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {cart.map((item, index) => (
+                    <CartItem 
+                      key={`${item.product.id}-${index}`}
+                      item={item}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onRemove={() => handleRemoveFromCart(item.product.id)}
+                      selectedPromo={selectedPromo}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Cart summary */}
+            {cart.length > 0 && (
+              <div className="p-4 border-t border-gray-100 bg-gray-50">
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Subtotal:</span>
+                    <span className="font-bold">{formatRupiah(calculateSubtotal())}</span>
+                  </div>
+                  
+                  {selectedPromo && (
+                    <div className="flex justify-between text-green-600">
+                      <span className="flex items-center">
+                        <FaTicketAlt className="mr-1" size={14} />
+                        Diskon ({selectedPromo.name})
+                      </span>
+                      <span className="font-medium text-green-600">-{formatRupiah(calculateDiscount())}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between text-gray-600 mt-1">
+                    <span className="flex items-center">
+                      <FaPercentage className="mr-1.5" size={14} />
+                      PPN (11%)
+                    </span>
+                    <span className="font-medium">{formatRupiah(calculateTax())}</span>
+                  </div>
+                  
+                  <div className="flex justify-between font-bold text-base mt-2 pt-2 border-t border-gray-200">
+                    <span>Total:</span>
+                    <span>{formatRupiah(calculateTotal())}</span>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleOpenPromoModal}
+                    className={`flex items-center justify-center px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 shadow-sm ${
+                      selectedPromo 
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                      }`}
+                  >
+                    <FaTicketAlt className="mr-2" size={14} />
+                    {selectedPromo ? selectedPromo.name : 'Pilih Promo'}
+                  </button>
+                  
+                  <button
+                    onClick={() => handlePayment()}
+                    disabled={cart.length === 0}
+                    className={`relative flex items-center justify-center px-4 py-3 rounded-lg font-medium text-sm transition-colors shadow ${
+                      cart.length === 0 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white hover:shadow-lg'
+                      }`}
+                  >
+                    {paymentMethod === 'cash' 
+                      ? amountPaid >= calculateTotal() 
+                        ? `Bayar (Kembalian: ${formatRupiah(amountPaid - calculateTotal())})` 
+                        : `Bayar (Kurang: ${formatRupiah(calculateTotal() - amountPaid)})`
+                      : 'Proses Pembayaran'
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* New Customer Modal */}
+      <Dialog open={isNewCustomerModalOpen} onOpenChange={setIsNewCustomerModalOpen}>
+        <DialogContent className="max-w-md relative overflow-hidden">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full opacity-40 transform translate-x-1/3 -translate-y-1/3 z-0"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-blue-50 to-orange-50 rounded-full opacity-30 transform -translate-x-1/3 translate-y-1/3 z-0"></div>
+          <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#ff8c42_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+          
+          <DialogHeader className="relative z-10">
+            <DialogTitle className="text-white text-xl font-semibold flex items-center">
+              <div className="p-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full text-white mr-3">
+                <FaUserPlus size={18} />
+              </div>
+              Tambah Pelanggan Baru
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 p-4 relative z-10">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name" className="text-sm font-medium text-gray-700 flex items-center">
+                  <FaUser className="mr-1 text-orange-400" size={12} />
+                  Nama Lengkap
+                </Label>
+                <Input
+                  id="name"
+                  value={newCustomerForm.name}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                  placeholder="Masukkan nama lengkap"
+                  className="mt-1 block w-full border-2 border-orange-200 focus:border-orange-400 shadow-sm rounded-lg"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="phone" className="text-sm font-medium text-gray-700 flex items-center">
+                  <FaPhone className="mr-1 text-orange-400" size={12} />
+                  Nomor Telepon
+                </Label>
+                <Input
+                  id="phone"
+                  value={newCustomerForm.phone}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                  placeholder="Contoh: 081234567890"
+                  className="mt-1 block w-full border-2 border-orange-200 focus:border-orange-400 shadow-sm rounded-lg"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Format: 08xxxxxxxxxx (tanpa spasi atau karakter khusus)</p>
+              </div>
+              
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700 flex items-center">
+                  <FaEnvelope className="mr-1 text-orange-400" size={12} />
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newCustomerForm.email}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                  placeholder="email@example.com"
+                  className="mt-1 block w-full border-2 border-orange-200 focus:border-orange-400 shadow-sm rounded-lg"
+                />
+              </div>
+              <div>
+                <Label htmlFor="address" className="text-sm font-medium text-gray-700 flex items-center">
+                  <FaMapMarkerAlt className="mr-1 text-orange-400" size={12} />
+                  Alamat
+                </Label>
+                <Input
+                  id="address"
+                  value={newCustomerForm.address}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
+                  placeholder="Masukkan alamat lengkap"
+                  className="mt-1 block w-full border-2 border-orange-200 focus:border-orange-400 shadow-sm rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex items-start space-x-3">
+              <div className="text-orange-500 mt-0.5">
+                <FaInfoCircle size={14} />
+              </div>
+              <div className="text-sm text-gray-500">
+                <p className="font-medium">Informasi Pelanggan</p>
+                <p className="mt-1">Data pelanggan akan disimpan untuk memudahkan transaksi berikutnya dan program loyalitas.</p>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="relative z-10">
+            <div className="flex space-x-3 w-full">
+              <Button 
+                onClick={() => setIsNewCustomerModalOpen(false)} 
+                variant="outline" 
+                className="flex-1 border-orange-200 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
+              >
+                Batal
+              </Button>
+              
+              <Button 
+                onClick={handleNewCustomer}
+                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+              >
+                Simpan & Lanjutkan
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Customer Selection Modal */}
+      <Dialog open={isCustomerSelectionOpen} onOpenChange={setIsCustomerSelectionOpen}>
+        <DialogContent className="max-w-md relative overflow-hidden">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full opacity-40 transform translate-x-1/3 -translate-y-1/3 z-0"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-blue-50 to-orange-50 rounded-full opacity-30 transform -translate-x-1/3 translate-y-1/3 z-0"></div>
+          <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#ff8c42_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+          
+          <DialogHeader className="relative z-10">
+            <DialogTitle className="text-xl font-bold text-gray-800 flex items-center">
+              <div className="p-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full text-white mr-3">
+                <FaUser size={18} />
+              </div>
+              Pilih Pelanggan
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 p-4 relative z-10">
+            {/* Search bar with decorative elements */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <FaSearch size={16} />
+              </div>
+              <Input
+                type="text"
+                value={searchCustomer}
+                onChange={(e) => setSearchCustomer(e.target.value)}
+                placeholder="Cari nama atau nomor telepon..."
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-orange-400"
+              />
+            </div>
+            
+            {/* Customer list with enhanced styling */}
+            <div className="bg-white rounded-lg border border-orange-100 overflow-hidden max-h-[300px] overflow-y-auto shadow-md">
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map(customer => (
+                  <div 
+                    key={customer.id} 
+                    className="p-3 border-b border-orange-100 hover:bg-orange-50 transition-colors cursor-pointer relative overflow-hidden"
+                    onClick={() => handleSelectCustomer(customer)}
+                  >
+                    {/* Subtle decorative element */}
+                    <div className="absolute right-0 top-0 w-16 h-16 bg-orange-100 rounded-full opacity-20 transform translate-x-1/2 -translate-y-1/2"></div>
+                    
+                    <div className="flex items-center space-x-3 relative z-10">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 flex items-center justify-center text-white font-bold text-xs">
+                        {customer.name.split(' ').map((n) => n[0]).join('').toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">{customer.name}</p>
+                        <p className="text-xs text-gray-500 mt-1">{customer.phone}</p>
+                        <p className="text-xs text-gray-500 mt-1">{customer.address}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-gray-100">
+                    <FaUserSlash className="w-full h-full p-3 text-gray-400" />
+                  </div>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Pelanggan tidak ditemukan</h3>
+                  <p className="text-sm text-gray-500 mt-1">Tidak ada pelanggan yang sesuai dengan pencarian Anda.</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-2 text-sm text-gray-500 bg-orange-50 p-3 rounded-lg border border-orange-100">
+              <FaInfoCircle className="text-orange-400" size={14} />
+              <p>Pelanggan baru? Klik tombol &quot;Tambah Pelanggan Baru&quot; di bawah.</p>
+            </div>
+          </div>
+          
+          <DialogFooter className="relative z-10">
+            <div className="flex space-x-3 w-full">
+              <Button 
+                onClick={() => setIsCustomerSelectionOpen(false)} 
+                variant="outline" 
+                className="flex-1 border-orange-200 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
+              >
+                Batal
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  setIsCustomerSelectionOpen(false);
+                  setIsNewCustomerModalOpen(true);
+                }}
+                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+              >
+                <FaUserPlus className="mr-2" size={14} />
+                Tambah Pelanggan Baru
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Payment Modal */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-white">
+          <div className="relative">
+            {/* Decorative header */}
+            <div className="absolute inset-0 h-32 bg-gradient-to-r from-orange-400 to-orange-500 rounded-t-lg" />
+            
+            {/* Content with relative positioning */}
+            <div className="relative z-10 pt-6 px-6">
+              <DialogTitle className="text-white text-xl font-semibold flex items-center">
+                <FaMoneyBillWave className="mr-2" />
+                Pembayaran
+              </DialogTitle>
+              
+              <div className="mt-6 bg-white rounded-t-lg p-4">
+                {!showReceiptOptions ? (
+                  <>
+                    {paymentStatus === 'idle' && (
+                      <>
+                        <div className="bg-gradient-to-r from-orange-50 to-white p-4 rounded-lg border border-orange-100 shadow-md mb-4">
+                          <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                            <FaShoppingCart className="mr-1.5 text-orange-400" size={12} />
+                            Ringkasan Pesanan
+                          </h3>
+                          
+                          <div className="mt-3 space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                            {cart.map((item) => (
+                              <div 
+                                key={item.product.id} 
+                                className="flex justify-between text-sm"
+                              >
+                                <div className="w-1/2">
+                                  <p className="font-medium text-gray-800">{item.product.name}</p>
+                                  <p className="text-xs text-gray-500">{formatRupiah(item.product.price)} x {item.quantity}</p>
+                                </div>
+                                <span className="w-1/6 text-center">{item.quantity}</span>
+                                <span className="w-1/3 text-right font-medium">{formatRupiah(item.product.price * item.quantity)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="flex justify-between text-sm">
+                              <span>Subtotal:</span>
+                              <span className="font-medium">{formatRupiah(calculateSubtotal())}</span>
+                            </div>
+                            
+                            {selectedPromo && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-green-600 flex items-center">
+                                  <FaTicketAlt className="mr-1" size={10} />
+                                  Diskon ({selectedPromo.name})
+                                </span>
+                                <span className="font-medium text-green-600">-{formatRupiah(calculateDiscount())}</span>
+                              </div>
+                            )}
+                            
+                            <div className="flex justify-between text-sm mt-1">
+                              <span className="flex items-center">
+                                <FaPercentage className="mr-1.5" size={14} />
+                                PPN (11%)
+                              </span>
+                              <span className="font-medium">{formatRupiah(calculateTax())}</span>
+                            </div>
+                            
+                            <div className="flex justify-between font-bold text-base mt-2 pt-2 border-t border-gray-200">
+                              <span>Total:</span>
+                              <span>{formatRupiah(calculateTotal())}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Customer info */}
+                        {selectedCustomer && (
+                          <div className="bg-white rounded-lg border border-orange-100 p-3 shadow-sm mb-4">
+                            <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                              <FaUser className="mr-1.5 text-orange-400" size={12} />
+                              Informasi Pelanggan
+                            </h3>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm text-gray-800">{selectedCustomer.name}</p>
+                              <p className="text-xs text-gray-500 flex items-center">
+                                <FaPhone className="mr-1" size={10} />
+                                {selectedCustomer.phone}
+                              </p>
+                              {selectedCustomer.email && (
+                                <p className="text-xs text-gray-500 flex items-center">
+                                  <FaEnvelope className="mr-1" size={10} />
+                                  {selectedCustomer.email}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 flex items-center">
+                                <FaMapMarkerAlt className="mr-1" size={10} />
+                                {selectedCustomer.address}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Payment method tabs */}
+                        <div className="mb-4">
+                          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                            <FaCreditCard className="mr-1.5 text-orange-400" size={12} />
+                            Metode Pembayaran
+                          </h3>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              onClick={() => setPaymentMethod('cash')}
+                              className={`flex flex-col items-center p-6 rounded-lg border transition-all ${
+                                paymentMethod === 'cash' 
+                                  ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                                  : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                              }`}
+                            >
+                              <FaMoneyBillWave size={20} className="mb-1" />
+                              <span className="text-xs font-medium">Tunai</span>
+                            </button>
+                            
+                            <button
+                              onClick={() => setPaymentMethod('card')}
+                              className={`flex flex-col items-center p-6 rounded-lg border transition-all ${
+                                paymentMethod === 'card' 
+                                  ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                                  : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                              }`}
+                            >
+                              <FaCreditCard size={20} className="mb-1" />
+                              <span className="text-xs font-medium">Kartu</span>
+                            </button>
+                            
+                            <button
+                              onClick={() => setPaymentMethod('qris')}
+                              className={`flex flex-col items-center p-6 rounded-lg border transition-all ${
+                                paymentMethod === 'qris' 
+                                  ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                                  : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                              }`}
+                            >
+                              <FaQrcode size={20} className="mb-1" />
+                              <span className="text-xs font-medium">QRIS</span>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Cash payment calculator */}
+                        {paymentMethod === 'cash' && (
+                          <div className="mb-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <h3 className="text-sm font-semibold text-gray-700 flex items-center">
+                                <FaCalculator className="mr-1.5 text-orange-400" size={12} />
+                                Kalkulator Pembayaran
+                              </h3>
+                              <span className="text-xs text-gray-500">Total: {formatRupiah(calculateTotal())}</span>
+                            </div>
+                            
+                            {/* Quick amount buttons */}
+                            <div className="grid grid-cols-4 gap-2 mb-3">
+                              {[50000, 100000, 200000, 500000].map((amount) => (
+                                <button
+                                  key={amount}
+                                  onClick={() => handleQuickAmount(amount)}
+                                  className="bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 rounded-lg py-1 px-2 text-sm font-medium transition-colors"
+                                >
+                                  {formatRupiah(amount)}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {/* Calculator display */}
+                            <div className="bg-white border-2 border-orange-200 rounded-lg p-2 mb-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-500">Jumlah Dibayar:</span>
+                                <span className="text-lg font-bold text-gray-800">{formatRupiah(amountPaid)}</span>
+                              </div>
+                              {amountPaid > calculateTotal() && (
+                                <div className="flex justify-between items-center mt-1 text-green-600">
+                                  <span className="text-sm">Kembalian:</span>
+                                  <span className="font-bold">{formatRupiah(amountPaid - calculateTotal())}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Calculator buttons */}
+                            <div className="grid grid-cols-4 gap-2">
+                              {['7', '8', '9', '⌫', '4', '5', '6', '+', '1', '2', '3', '-', '0', '00', 'C', '='].map((btn) => (
+                                <button
+                                  key={btn}
+                                  onClick={() => handleCalculatorInput(btn)}
+                                  className={`p-2 rounded-lg text-center font-medium transition-colors ${
+                                    btn === 'C' 
+                                      ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                      : btn === '⌫' || btn === '+' || btn === '-' || btn === '=' 
+                                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {btn}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Card payment instructions */}
+                        {(paymentMethod === 'credit' || paymentMethod === 'debit') && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
+                            <h3 className="text-blue-800 font-medium mb-2">Instrucciones de Pago con Tarjeta</h3>
+                            <ol className="list-decimal list-inside text-sm text-blue-700 space-y-1">
+                              <li>Inserte o deslice la tarjeta en el terminal</li>
+                              <li>Confirme el monto: {formatRupiah(calculateTotal())}</li>
+                              <li>Ingrese el PIN si es necesario</li>
+                              <li>Espere a que se complete la transacción</li>
+                            </ol>
+                          </div>
+                        )}
+                        
+                        {/* QRIS payment instructions */}
+                        {paymentMethod === 'qris' && (
+                          <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md">
+                            <div className="text-center mb-4">
+                              <h3 className="text-lg font-semibold">Scan QRIS Code</h3>
+                              <p className="text-sm text-gray-500">Gunakan aplikasi e-wallet untuk scan</p>
+                            </div>
+                            <div className="bg-gray-100 p-4 rounded-lg mb-4 flex items-center justify-center">
+                              <FaQrcode size={150} className="text-gray-700" />
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">Total: {formatRupiah(calculateTotal())}</p>
+                            <Button 
+                              className="w-full mt-2" 
+                              onClick={() => handlePaymentComplete()}
+                            >
+                              Konfirmasi Pembayaran
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Processing payment state */}
+                    {paymentStatus === 'processing' && (
+                      <div className="py-8 flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 border-4 border-t-orange-500 border-orange-200 rounded-full animate-spin mb-4"></div>
+                        <h3 className="text-lg font-bold text-gray-700 mb-1">Memproses Pembayaran</h3>
+                        <p className="text-gray-500 text-sm text-center">
+                          Mohon tunggu sebentar sementara kami memproses pembayaran Anda...
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Payment success state */}
+                    {paymentStatus === 'success' && (
+                      <div className="py-8 flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-500 mb-4">
+                          <FaCheckCircle size={40} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-700 mb-1">Pembayaran Berhasil!</h3>
+                        <p className="text-gray-500 text-sm text-center mb-4">
+                          Transaksi telah berhasil diproses. Terima kasih atas pembelian Anda.
+                        </p>
+                        <div className="flex space-x-2">
+                          <Button 
+                            onClick={() => setShowReceiptOptions(true)}
+                            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                          >
+                            <FaReceipt className="mr-2" size={14} />
+                            Cetak Struk
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-6">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 text-center">Opsi Struk Belanja</h3>
+                    
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                      <button
+                        onClick={() => setReceiptMethod('print')}
+                        className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                          receiptMethod === 'print' 
+                            ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                            : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                        }`}
+                      >
+                        <FaPrint size={24} className="mb-2" />
+                        <span className="text-sm font-medium">Cetak</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setReceiptMethod('whatsapp')}
+                        className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                          receiptMethod === 'whatsapp' 
+                            ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                            : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                        }`}
+                      >
+                        <FaWhatsapp size={24} className="mb-2" />
+                        <span className="text-sm font-medium">WhatsApp</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setReceiptMethod('email')}
+                        className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                          receiptMethod === 'email' 
+                            ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                            : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                        }`}
+                      >
+                        <FaEnvelope size={24} className="mb-2" />
+                        <span className="text-sm font-medium">Email</span>
+                      </button>
+                    </div>
+                    
+                    {/* Receipt method specific content */}
+                    {receiptMethod === 'print' && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
+                        <div className="flex items-center">
+                          <div className="text-blue-500 mt-0.5">
+                            <FaInfoCircle size={16} />
+                          </div>
+                          <div className="text-sm text-blue-700">
+                            <p className="font-medium">Cetak Struk</p>
+                            <p className="mt-1">Struk akan dicetak melalui printer yang terhubung.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {receiptMethod === 'whatsapp' && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
+                        <div className="flex items-center">
+                          <div className="text-blue-500 mt-0.5">
+                            <FaInfoCircle size={16} />
+                          </div>
+                          <div className="text-sm text-blue-700">
+                            <p className="font-medium">Kirim via WhatsApp</p>
+                            <p className="mt-1">Struk akan dikirim ke nomor: {selectedCustomer?.phone || 'Tidak ada nomor'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {receiptMethod === 'email' && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
+                        <div className="flex items-center">
+                          <div className="text-blue-500 mt-0.5">
+                            <FaInfoCircle size={16} />
+                          </div>
+                          <div className="text-sm text-blue-700">
+                            <p className="font-medium">Kirim via Email</p>
+                            <p className="mt-1">Struk akan dikirim ke email: {selectedCustomer?.email || 'Tidak ada email'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex space-x-3">
+                      <Button 
+                        onClick={() => setShowReceiptOptions(false)}
+                        variant="outline" 
+                        className="flex-1 border-orange-200 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
+                      >
+                        Kembali
+                      </Button>
+                      
+                      <Button 
+                        onClick={() => {
+                          if (receiptMethod === 'print') {
+                            handlePrintReceipt();
+                          } else if (receiptMethod === 'whatsapp') {
+                            handleSendWhatsApp();
+                          } else if (receiptMethod === 'email') {
+                            handleSendEmail();
+                          }
+                        }}
+                        className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                      >
+                        Kirim Struk
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {!showReceiptOptions && paymentStatus === 'idle' && (
+            <div className="bg-gray-50 px-6 py-4 flex justify-between">
+              <Button 
+                onClick={() => setIsPaymentModalOpen(false)}
+                variant="outline" 
+                className="border-gray-300"
+              >
+                Batal
+              </Button>
+              
+              <Button 
+                onClick={handlePaymentProcess}
+                disabled={Boolean(isPaymentProcessing || (paymentMethod === 'cash' && cashAmount && parseInt(cashAmount) < calculateTotal()))}
+                className={`relative flex items-center justify-center px-4 py-3 rounded-lg font-medium text-sm transition-colors shadow ${
+                  (isPaymentProcessing || (paymentMethod === 'cash' && cashAmount && parseInt(cashAmount) < calculateTotal())) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {paymentMethod === 'cash' 
+                  ? amountPaid >= calculateTotal() 
+                    ? `Bayar (Kembalian: ${formatRupiah(amountPaid - calculateTotal())})` 
+                    : `Bayar (Kurang: ${formatRupiah(calculateTotal() - amountPaid)})`
+                  : 'Proses Pembayaran'
+                }
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Product Detail Modal */}
+      <Dialog open={isProductDetailModalOpen} onOpenChange={setIsProductDetailModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-800 flex items-center">
+              <div className="p-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full text-white mr-3">
+                <FaBoxOpen size={18} />
+              </div>
+              Detail Produk
+            </DialogTitle>
+            <DialogDescription className="text-orange-600/70">
+              Informasi lengkap tentang produk
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedProduct && (
+            <div className="space-y-4">
+              {/* Product image and basic info */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="w-full md:w-1/3 bg-gradient-to-br from-orange-50 to-white rounded-lg border border-orange-100 p-3 flex items-center justify-center">
+                  {selectedProduct.image ? (
+                    <Image
+                      src={selectedProduct.image}
+                      alt={selectedProduct.name}
+                      width={120}
+                      height={120}
+                      className="object-contain max-h-[120px] max-w-[120px]"
+                    />
+                  ) : (
+                    <div className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-full border border-orange-200">
+                      <FaBoxOpen className="text-orange-300" size={48} />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="w-full md:w-2/3">
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">{selectedProduct.name}</h3>
+                  
+                  <div className="flex items-center mb-2">
+                    <span className="text-sm bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full mr-2">
+                      {selectedProduct.category}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      ID: {selectedProduct.id}
+                    </span>
+                  </div>
+                  
+                  <div className="text-xl font-bold text-orange-600 mb-2">
+                    {formatRupiah(selectedProduct.price)}
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-2">
+                    {selectedProduct.description || 'Tidak ada deskripsi produk'}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Inventory information */}
+              <div className="bg-gradient-to-r from-white to-orange-50 rounded-lg border border-orange-100 p-4">
+                <h4 className="font-medium text-gray-800 mb-3 flex items-center">
+                  <FaWarehouse className="mr-2 text-orange-500" size={16} />
+                  Informasi Stok
+                </h4>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <div className="w-24 text-sm text-gray-600">Rak Display:</div>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                      <div className="bg-gradient-to-r from-orange-400 to-orange-500 h-2.5 rounded-full" style={{ width: '70%' }}></div>
+                    </div>
+                    <div className="w-28 text-right text-sm font-medium text-gray-700 ml-2">
+                      70% ({Math.round(selectedProduct.stock * 0.7)} unit)
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <div className="w-24 text-sm text-gray-600">Gudang:</div>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                      <div className="bg-gradient-to-r from-blue-400 to-blue-500 h-2.5 rounded-full" style={{ width: '30%' }}></div>
+                    </div>
+                    <div className="w-28 text-right text-sm font-medium text-gray-700 ml-2">
+                      30% ({Math.round(selectedProduct.stock * 0.3)} unit)
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Stock distribution */}
+              <div className="bg-gradient-to-r from-white to-orange-50 rounded-lg border border-orange-100 p-4">
+                <h4 className="font-medium text-gray-800 mb-3 flex items-center">
+                  <FaChartPie className="mr-2 text-orange-500" size={16} />
+                  Distribusi Stok
+                </h4>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Rak Display:</span>
+                    <span className="font-medium">{Math.round(selectedProduct.stock * 0.7)} unit</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Gudang:</span>
+                    <span className="font-medium">{Math.round(selectedProduct.stock * 0.3)} unit</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsProductDetailModalOpen(false)} 
+              variant="outline" 
+              className="border-orange-200 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
+            >
+              Tutup
+            </Button>
+            
+            {selectedProduct && (
+              <Button 
+                onClick={() => {
+                  handleAddToCart(selectedProduct);
+                  setIsProductDetailModalOpen(false);
+                }}
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                disabled={selectedProduct.stock <= 0}
+              >
+                {selectedProduct.stock <= 0 ? (
+                  <>
+                    <FaBan className="mr-1.5" size={14} />
+                    Stok Habis
+                  </>
+                ) : (
+                  <>
+                    <FaCartPlus className="mr-1.5" size={14} />
+                    Tambah ke Keranjang
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Promo Selection Modal */}
+      <Dialog open={isPromoModalOpen} onOpenChange={setIsPromoModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-800 flex items-center">
+              <div className="p-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full text-white mr-3">
+                <FaTicketAlt size={18} />
+              </div>
+              Pilih Promo
+            </DialogTitle>
+            <DialogDescription className="text-orange-600/70">
+              Pilih promo yang ingin diterapkan pada transaksi ini
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {/* Search promo */}
+            <div className="mb-4 relative">
+              <Input
+                placeholder="Cari promo..."
+                value={searchPromo}
+                onChange={(e) => setSearchPromo(e.target.value)}
+                className="pr-10 border-orange-200 focus:border-orange-400 focus:ring-orange-200"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-400">
+                <FaSearch size={14} />
+              </div>
+            </div>
+            
+            {/* Promo list */}
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {/* Promo items - menampilkan promo yang tersedia */}
+              {promos.filter(promo => 
+                promo.name.toLowerCase().includes(searchPromo.toLowerCase()) ||
+                promo.description.toLowerCase().includes(searchPromo.toLowerCase())
+              ).map(promo => (
+                <div 
+                  key={promo.id} 
+                  className={`p-3 border rounded-lg transition-all cursor-pointer ${
+                    selectedPromo?.id === promo.id 
+                      ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-orange-100' 
+                      : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                  }`}
+                  onClick={() => {
+                    setSelectedPromo(promo);
+                    setIsPromoModalOpen(false);
+                  }}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium text-gray-800">{promo.name}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
+                      
+                      <div className="flex items-center mt-2 text-sm">
+                        <span className="text-gray-500 flex items-center mr-3">
+                          <FaClock className="mr-1" size={12} />
+                          {new Date(promo.startDate).toLocaleDateString()} - {new Date(promo.endDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-orange-100 to-orange-200 text-orange-700 px-2 py-1 rounded-lg text-sm font-medium whitespace-nowrap">
+                      {promo.discountType === 'percentage'
+                        ? `${promo.discountValue}%`
+                        : formatRupiah(promo.discountValue)
+                      }
+                    </div>
+                  </div>
+                  
+                  {promo.minPurchase > 0 && (
+                    <div className="mt-2 text-xs text-gray-500 border-t border-orange-100 pt-2">
+                      Min. pembelian: {formatRupiah(promo.minPurchase)}
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* No promos found */}
+              {searchPromo && promos.filter(promo => 
+                promo.name.toLowerCase().includes(searchPromo.toLowerCase()) ||
+                promo.description.toLowerCase().includes(searchPromo.toLowerCase())
+              ).length === 0 && (
+                <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                  <div className="p-6 bg-orange-50 rounded-full mb-4 border border-orange-100">
+                    <FaTicketAlt className="text-orange-300" size={24} />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">Tidak ada promo yang ditemukan</p>
+                  <p className="text-xs text-gray-500 mt-1">Coba kata kunci lain</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsPromoModalOpen(false)} 
+              variant="outline" 
+              className="border-orange-200 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300"
+            >
+              Batal
+            </Button>
+            
+            <Button 
+              onClick={() => {
+                setSelectedPromo(null); 
+                setIsPromoModalOpen(false);
+              }}
+              variant="outline" 
+              className="border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
+            >
+              Hapus Promo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Payment Modal */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="max-w-2xl relative overflow-hidden p-0">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full opacity-40 transform translate-x-1/3 -translate-y-1/3 z-0"></div>
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-orange-100 to-orange-50 rounded-full opacity-40 transform -translate-x-1/3 translate-y-1/3 z-0"></div>
+          
+          <div className="relative z-10 p-6">
+            <DialogHeader>
+              <div className="flex items-center">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-lg mr-3 shadow-md">
+                  <FaShoppingCart className="text-white" size={18} />
+                </div>
+                <DialogTitle className="text-2xl font-bold text-gray-800">
+                  {paymentStep === 'customer' && 'Pilih Customer'}
+                  {paymentStep === 'payment' && 'Metode Pembayaran'}
+                  {paymentStep === 'receipt' && 'Struk Pembayaran'}
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-gray-600">
+                {paymentStep === 'customer' && 'Pilih atau tambahkan customer untuk transaksi ini'}
+                {paymentStep === 'payment' && 'Pilih metode pembayaran yang akan digunakan'}
+                {paymentStep === 'receipt' && 'Pilih cara mencetak atau mengirim struk pembayaran'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {/* Step Indicator */}
+            <div className="flex items-center justify-center max-w-md mx-auto my-5">
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                  paymentStep === 'customer' 
+                    ? 'bg-white text-orange-500' 
+                    : 'bg-orange-100 text-orange-500'
+                }">
+                  <FaUser size={16} />
+                </div>
+                <span className="text-xs font-medium text-gray-600">Customer</span>
+              </div>
+              
+              <div className="flex-1 h-1 mx-4 bg-gray-200 rounded">
+                <div className={`h-full bg-orange-500 rounded ${
+                  paymentStep === 'customer' ? 'w-0' : paymentStep === 'payment' ? 'w-1/2' : 'w-full'
+                }`}></div>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                  paymentStep === 'payment'
+                    ? 'bg-white text-orange-500' 
+                    : paymentStep === 'receipt' ? 'bg-orange-100 text-orange-500' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  <FaCreditCard size={16} />
+                </div>
+                <span className="text-xs font-medium text-gray-600">Pembayaran</span>
+              </div>
+              
+              <div className="flex-1 h-1 mx-4 bg-gray-200 rounded">
+                <div className={`h-full bg-orange-500 rounded ${
+                  paymentStep === 'receipt' ? 'w-full' : 'w-0'
+                }`}></div>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                  paymentStep === 'receipt'
+                    ? 'bg-white text-orange-500' 
+                    : 'bg-gray-100 text-gray-400'
+                }`}>
+                  <FaReceipt size={16} />
+                </div>
+                <span className="text-xs font-medium text-gray-600">Struk</span>
+              </div>
+            </div>
+            
+            {/* Customer Selection */}
+            {paymentStep === 'customer' && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <button
+                    onClick={() => handleCustomerTypeChange('walkin')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      customerType === 'walkin' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      customerType === 'walkin' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaUserAlt size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">Customer Walk-in</h3>
+                    <p className="text-xs text-gray-500 mt-1">Tanpa data customer</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCustomerTypeChange('existing')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      customerType === 'existing' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      customerType === 'existing' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaUsers size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">Customer Terdaftar</h3>
+                    <p className="text-xs text-gray-500 mt-1">Pilih dari database</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCustomerTypeChange('new')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      customerType === 'new' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      customerType === 'new' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaUserPlus size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">Customer Baru</h3>
+                    <p className="text-xs text-gray-500 mt-1">Tambah customer baru</p>
+                  </button>
+                </div>
+                
+                <div className="mt-4">
+                  {customerType === 'walkin' && (
+                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 text-center">
+                      <p className="text-sm text-gray-700">Customer walk-in tidak perlu mengisi data. Anda dapat langsung melanjutkan ke pembayaran.</p>
+                    </div>
+                  )}
+                  
+                  {customerType === 'existing' && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Cari Customer</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            placeholder="Nama atau nomor telepon..."
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 pl-10"
+                          />
+                          <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                        </div>
+                      </div>
+                      
+                      <div className="max-h-56 overflow-y-auto p-1">
+                        {paymentFilteredCustomers.length === 0 ? (
+                          <div className="text-center py-6 text-gray-500">
+                            <p>Tidak ada customer yang ditemukan</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {paymentFilteredCustomers.map(customer => (
+                              <div 
+                                key={customer.id}
+                                onClick={() => handleSelectCustomer(customer)}
+                                className={`p-3 rounded-lg cursor-pointer transition-all ${
+                                  selectedCustomerData?.id === customer.id
+                                    ? 'bg-orange-100 border border-orange-300'
+                                    : 'bg-gray-50 border border-gray-200 hover:border-orange-200'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h4 className="font-medium text-gray-800">{customer.name}</h4>
+                                    <div className="text-xs text-gray-500 mt-1">{customer.phone}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{customer.address}</div>
+                                  </div>
+                                  {selectedCustomerData?.id === customer.id && (
+                                    <div className="bg-orange-500 text-white p-1 rounded-full">
+                                      <FaCheck size={12} />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {customerType === 'new' && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="name"
+                            value={newCustomerForm.name}
+                            onChange={handleNewCustomerInputChange}
+                            placeholder="Nama lengkap customer"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Telepon <span className="text-red-500">*</span></label>
+                          <input
+                            type="tel"
+                            name="phone"
+                            value={newCustomerForm.phone}
+                            onChange={handleNewCustomerInputChange}
+                            placeholder="contoh: 081234567890"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                          <input
+                            type="email"
+                            name="email"
+                            value={newCustomerForm.email}
+                            onChange={handleNewCustomerInputChange}
+                            placeholder="email@example.com"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                          />
+                        </div>
+                        
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Alamat <span className="text-red-500">*</span></label>
+                          <textarea
+                            name="address"
+                            value={newCustomerForm.address}
+                            onChange={(e) => setNewCustomerForm(prev => ({ ...prev, address: e.target.value }))}
+                            placeholder="Alamat lengkap customer"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            rows={2}
+                            required
+                          ></textarea>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Step 2: Payment Method */}
+            {paymentStep === 'payment' && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800">Pilih Metode Pembayaran</h3>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <button
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      paymentMethod === 'cash' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      paymentMethod === 'cash' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaMoneyBillWave size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">Tunai</h3>
+                    <p className="text-xs text-gray-500 mt-1">Pembayaran langsung</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      paymentMethod === 'card' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      paymentMethod === 'card' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaCreditCard size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">Kartu Debit/Kredit</h3>
+                    <p className="text-xs text-gray-500 mt-1">Pembayaran kartu</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => setPaymentMethod('ewallet')}
+                    className={`flex flex-col items-center p-6 rounded-xl transition-all ${
+                      paymentMethod === 'ewallet' 
+                        ? 'bg-gradient-to-r from-orange-50 to-white border-2 border-orange-500 shadow-md' 
+                        : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-full mb-3 ${
+                      paymentMethod === 'ewallet' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500' 
+                    }`}>
+                      <FaWallet size={20} />
+                    </div>
+                    <h3 className="text-sm font-semibold">E-Wallet</h3>
+                    <p className="text-xs text-gray-500 mt-1">QRIS, OVO, GoPay, dll</p>
+                  </button>
+                </div>
+                
+                {/* Cash Payment Calculator */}
+                {paymentMethod === 'cash' && (
+                  <div className="mt-4 bg-white p-4 rounded-xl border border-gray-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-medium text-gray-700">Detail Pembayaran</h3>
+                      <div className="text-sm text-gray-500">Total: {formatRupiah(calculateTotal())}</div>
+                    </div>
+                    
+                    {/* Quick amount buttons */}
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Uang Diterima</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span className="text-gray-500">Rp</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={cashAmount}
+                            onChange={(e) => {
+                              // Hanya memperbolehkan angka
+                              const re = /^[0-9\b]+$/;
+                              if (e.target.value === '' || re.test(e.target.value)) {
+                                setCashAmount(e.target.value);
+                              }
+                            }}
+                            placeholder="0"
+                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-right text-lg font-bold"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-4 gap-2">
+                        {['50000', '100000', '200000', '500000'].map((amount) => (
+                          <button
+                            key={amount}
+                            onClick={() => setCashAmount(amount)}
+                            className="py-2 px-3 bg-gray-100 border border-gray-200 rounded-lg text-center hover:bg-orange-50 hover:border-orange-200 transition-colors"
+                          >
+                            {formatRupiah(parseInt(amount))}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm text-gray-600">Total Belanja:</span>
+                          <span className="font-medium">{formatRupiah(calculateTotal())}</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm text-gray-600">Uang Diterima:</span>
+                          <span className="font-medium">{cashAmount ? formatRupiah(parseInt(cashAmount)) : '-'}</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-orange-200 mt-2">
+                          <span className="text-sm font-medium text-gray-700">Kembalian:</span>
+                          <span className="font-bold text-lg">
+                            {cashAmount && parseInt(cashAmount) >= calculateTotal()
+                              ? formatRupiah(parseInt(cashAmount) - calculateTotal())
+                              : formatRupiah(0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Card Payment */}
+                {paymentMethod === 'card' && (
+                  <div className="mt-4 bg-white p-4 rounded-xl border border-gray-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-medium text-gray-700">Detail Pembayaran Kartu</h3>
+                      <div className="text-sm text-gray-500">Total: {formatRupiah(calculateTotal())}</div>
+                    </div>
+                    
+                    <div className="text-center py-6">
+                      <div className="inline-flex justify-center items-center p-4 bg-orange-50 rounded-full mb-4">
+                        <FaCreditCard className="text-orange-400" size={32} />
+                      </div>
+                      <p className="text-gray-600 mb-2">Siapkan mesin EDC untuk memproses pembayaran</p>
+                      <p className="text-sm text-gray-500">Nasabah akan diminta untuk memasukkan kartu dan PIN</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* E-Wallet Payment */}
+                {paymentMethod === 'ewallet' && (
+                  <div className="mt-4 bg-white p-4 rounded-xl border border-gray-200">
+                    <div className="text-center py-6">
+                      <div className="inline-flex justify-center items-center p-4 bg-orange-50 rounded-full mb-4">
+                        <FaQrcode className="text-orange-400" size={32} />
+                      </div>
+                      <p className="text-gray-600 mb-2">Tampilkan QRIS untuk pembayaran</p>
+                      <p className="text-sm text-gray-500">Customer dapat melakukan scan dengan aplikasi e-wallet</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Summary section */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex flex-col space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span>{formatRupiah(calculateSubtotal())}</span>
+                </div>
+                {selectedPromo && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Diskon ({selectedPromo.name}):</span>
+                    <span>-{formatRupiah(calculateDiscount())}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-gray-600 mt-1">
+                  <span className="flex items-center">
+                    <FaPercentage className="mr-1.5" size={14} />
+                    PPN (11%)
+                  </span>
+                  <span className="font-medium">{formatRupiah(calculateTax())}</span>
+                </div>
+                
+                <div className="flex justify-between font-bold text-base pt-2 border-t border-gray-200">
+                  <span>Total:</span>
+                  <span>{formatRupiah(calculateTotal())}</span>
+                </div>
+                
+                {paymentStep === 'payment' && paymentMethod === 'cash' && cashAmount && (
+                  <div className="flex justify-between text-orange-600 pt-2">
+                    <span>Kembalian:</span>
+                    <span>
+                      {parseInt(cashAmount) >= calculateTotal()
+                        ? formatRupiah(parseInt(cashAmount) - calculateTotal())
+                        : formatRupiah(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Footer with navigation buttons */}
+          <div className="bg-gray-50 px-6 py-4 rounded-b-xl border-t border-gray-200 flex justify-between">
+            {paymentStep === 'customer' ? (
+              <button
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Batal
+              </button>
+            ) : (
+              <button
+                onClick={handlePrevStep}
+                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors flex items-center"
+              >
+                <FaArrowLeft className="mr-2" /> Kembali
+              </button>
+            )}
+            
+            <button
+              onClick={handleNextStep}
+              disabled={Boolean(isPaymentProcessing || (paymentMethod === 'cash' && cashAmount && parseInt(cashAmount) < calculateTotal()))}
+              className={`px-6 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg font-medium transition-colors flex items-center ${
+                (isPaymentProcessing || (paymentMethod === 'cash' && cashAmount && parseInt(cashAmount) < calculateTotal())) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isPaymentProcessing ? (
+                <>
+                  <div className="mr-2 animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  Memproses...
+                </>
+              ) : (
+                <>
+                  {paymentStep === 'payment' ? 'Bayar Sekarang' : 'Lanjutkan'} <FaArrowRight className="ml-2" />
+                </>
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Receipt Modal */}
+      <Dialog open={isReceiptModalOpen} onOpenChange={setIsReceiptModalOpen}>
+        <DialogContent className="bg-white rounded-xl shadow-xl max-w-md w-full mx-auto">
+          <div className="bg-gradient-to-r from-orange-500 to-orange-400 py-4 px-6 rounded-t-xl text-white">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Pembayaran Berhasil!</h2>
+              <button
+                onClick={() => setIsReceiptModalOpen(false)}
+                className="text-white hover:text-orange-100"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            <div className="flex flex-col items-center justify-center mb-6">
+              <div className="bg-green-100 p-4 rounded-full mb-4">
+                <FaCheckCircle className="text-green-500" size={48} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-1">Transaksi Selesai</h3>
+              <p className="text-gray-600 text-center">Pembayaran telah berhasil diproses</p>
+            </div>
+            
+            <div className="bg-orange-50 rounded-xl p-4 mb-6 border border-orange-100">
+              <h4 className="font-medium text-gray-800 mb-3">Detail Transaksi</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Nomor Transaksi:</span>
+                  <span className="font-medium">INV-{Date.now().toString().substring(5)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tanggal:</span>
+                  <span className="font-medium">{new Date().toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Pembayaran:</span>
+                  <span className="font-medium">{formatRupiah(calculateTotal())}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <h4 className="font-medium text-gray-800 mb-3">Pilih Cara Pengiriman Struk</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => setReceiptMethod('print')}
+                  className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                    receiptMethod === 'print' 
+                      ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                      : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                  }`}
+                >
+                  <FaPrint size={24} className="mb-2" />
+                  <span className="text-sm font-medium">Cetak</span>
+                </button>
+                
+                <button
+                  onClick={() => setReceiptMethod('whatsapp')}
+                  className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                    receiptMethod === 'whatsapp' 
+                      ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                      : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                  }`}
+                >
+                  <FaWhatsapp size={24} className="mb-2" />
+                  <span className="text-sm font-medium">WhatsApp</span>
+                </button>
+                
+                <button
+                  onClick={() => setReceiptMethod('email')}
+                  className={`flex flex-col items-center p-4 rounded-lg border transition-all ${
+                    receiptMethod === 'email' 
+                      ? 'bg-orange-50 border-orange-300 text-orange-600' 
+                      : 'bg-white border border-gray-200 hover:border-orange-200 hover:bg-orange-50'
+                  }`}
+                >
+                  <FaEnvelope size={24} className="mb-2" />
+                  <span className="text-sm font-medium">Email</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 px-6 py-4 rounded-b-xl border-t border-gray-200 flex space-x-4">
+            <button
+              onClick={() => setIsReceiptModalOpen(false)}
+              className="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-lg font-medium transition-colors flex-1"
+            >
+              Selesai
+            </button>
+            
+            <button
+              onClick={() => {
+                if (receiptMethod === 'print') {
+                  handlePrintReceipt();
+                } else if (receiptMethod === 'whatsapp') {
+                  handleSendWhatsApp();
+                } else if (receiptMethod === 'email') {
+                  handleSendEmail();
+                }
+                setIsReceiptModalOpen(false);
+              }}
+              className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+            >
+              {receiptMethod === 'print' ? 'Cetak Struk' : 
+               receiptMethod === 'whatsapp' ? 'Kirim via WhatsApp' :
+               'Kirim via Email'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </PosLayout>
+  );
+};
+
+export default KasirPage;

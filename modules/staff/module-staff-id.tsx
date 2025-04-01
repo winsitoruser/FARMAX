@@ -133,7 +133,7 @@ const ModuleStaffId: React.FC<Props> = ({ data }) => {
 
   const archivedStaff = async () => {
     const res = await archive(data.id)
-    if (res.status === 201) {
+    if (res.success) {
       router.push('/staff');
     }
   }

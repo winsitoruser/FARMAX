@@ -165,7 +165,7 @@ const ModuleChooseProduct: React.FC<PropsType> = ({ setViewDrugs }) => {
     selectedRowIds.forEach((rowId) => {
       const product = data.find((product) => product.id === rowId);
       if (product) {
-        picked(product);
+        picked(product as any);
       }
     });
   }
@@ -176,7 +176,7 @@ const ModuleChooseProduct: React.FC<PropsType> = ({ setViewDrugs }) => {
         <Button onClick={handleChoose} size={'sm'}>Pick Selected Products</Button>
       </div>
       {isLoading ? <DataTableLoading columnCount={6}/> :
-      <DataTable data={data} columns={columns} withOutToolbar />
+      <DataTable data={data} columns={columns as any} withOutToolbar />
       }
     </div>
   )

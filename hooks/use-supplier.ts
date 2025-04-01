@@ -2,115 +2,82 @@ import { BASE_URL } from "@/lib/constants";
 import fetcher from "@/lib/fetcher";
 import { Supplier } from "@/types/supplier";
 import useSWR, { mutate } from "swr";
-import { toastAlert } from '@/components/common/alerts'
+import { ApiResponse, handleApiResponse } from '@/lib/api-utils';
+import { toastAlert } from '@/components/common/alerts';
 
 const API_URL = `${BASE_URL}/supplier`;
 
 const useSupplier = () => {
-  const { data, error } = useSWR<Supplier[]>(API_URL, fetcher);
+  const { data, error, isLoading } = useSWR<Supplier[]>(API_URL, fetcher);
 
-  const performRequest = async (method: string, url: string, data?: any, rest?: any) => {
+  const performRequest = async <T>(method: string, url: string, data?: any): Promise<ApiResponse<T>> => {
     try {
-      const response = await fetch(url, {
+      const options: RequestInit = {
         method,
-        ...rest,
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        return response.json();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Request failed');
-      }
-    } catch (error: unknown) {
-      throw error;
+        headers: data ? { 'Content-Type': 'application/json' } : undefined,
+        body: data ? JSON.stringify(data) : undefined,
+      };
+      
+      const response = await fetch(url, options);
+      return await handleApiResponse<T>(response);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Request failed';
+      return { data: null, error: errorMessage, success: false, status: 500 };
     }
-  }
+  };
 
   const refreshSupplier = () => {
     mutate(API_URL);
-  }
+  };
 
-  const updateStatusSupplier = async (id: string, formData: FormData) => {
-    try {
-      const urlEncodedData = new URLSearchParams();
+  const getSupplierById = async (id: string): Promise<ApiResponse<Supplier>> => {
+    return performRequest<Supplier>('GET', `${API_URL}/${id}`);
+  };
 
-      if (formData) {
-        for (const pair of formData.entries()) {
-          if (!(pair[1] instanceof File)) {
-            urlEncodedData.append(pair[0], pair[1]);
-          }
-        }
-      }
-      const response = await fetch(`${BASE_URL}/supplier/status/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: urlEncodedData,
-      })
-      const responseData = await response.json();
-      console.log(responseData)
-      if (!response.ok) {
-        toastAlert(responseData.message || 'Request Failed', 'error');
-      } else {
-        toastAlert('Status updated successfully', 'success');
-        refreshSupplier();
-      }
-    } catch (error: unknown) {
-      toastAlert('Failed to update', 'error');
-    }
-  }
-
-  const createSupplier = async (data: any) => {
-    try {
-      await performRequest('POST', API_URL, data, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      toastAlert('Supplier created successfully', 'success');
+  const createSupplier = async (supplierData: Omit<Supplier, 'id'>): Promise<ApiResponse<Supplier>> => {
+    const result = await performRequest<Supplier>('POST', API_URL, supplierData);
+    
+    if (result.success) {
       refreshSupplier();
-    } catch (error: unknown) {
-      toastAlert('Failed to create', 'error');
+      toastAlert('Supplier berhasil ditambahkan', 'success');
     }
-  }
+    
+    return result;
+  };
 
-  const deleteSupplier = async (id: string) => {
-    try {
-      await performRequest('DELETE', `${API_URL}/${id}`);
-      toastAlert('Deleted successfully', 'success');
+  const updateSupplier = async (id: string, supplierData: Partial<Supplier>): Promise<ApiResponse<Supplier>> => {
+    const result = await performRequest<Supplier>('PUT', `${API_URL}/${id}`, supplierData);
+    
+    if (result.success) {
       refreshSupplier();
-    } catch (error: unknown) {
-      toastAlert('Failed to delete', 'error');
+      toastAlert('Supplier berhasil diperbarui', 'success');
     }
-  }
+    
+    return result;
+  };
 
-  const getSupplierById = async (id: string) => {
-    try {
-      const response = await fetch(`${API_URL}/${id}`);
-      if (response.ok) {
-        return response.json();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Request failed');
-      }
-    } catch (error: unknown) {
-      throw error;
+  const deleteSupplier = async (id: string): Promise<ApiResponse<void>> => {
+    const result = await performRequest<void>('DELETE', `${API_URL}/${id}`);
+    
+    if (result.success) {
+      refreshSupplier();
+      toastAlert('Supplier berhasil dihapus', 'success');
     }
-  }
+    
+    return result;
+  };
 
   return {
-    isLoading: !error && !data,
-    isError: error,
-    data: data || [],
-    refreshSupplier,
-    updateStatusSupplier,
+    suppliers: data || [],
+    data: data || [], // Add data property for backward compatibility
+    isLoading,
+    error,
     getSupplierById,
     createSupplier,
+    updateSupplier,
     deleteSupplier,
-  }
-}
+    refreshSupplier
+  };
+};
 
 export default useSupplier;

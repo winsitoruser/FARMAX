@@ -6,91 +6,69 @@ import React from 'react'
 import { FaTruck, GiMedicines, IoStorefrontSharp, MdInventory } from './Icons'
 
 
-type StatProps = {
-  title: string,
-  value: number,
-  Icon: React.ReactNode,
-  classColor: string
+type StatistikProps = {
+  judul: string,
+  nilai: number,
+  Ikon: React.ReactNode,
+  warnaKelas: string
 }
 
-const Stat: React.FC<StatProps> = ({ title, value, Icon, classColor }) => {
+const Statistik: React.FC<StatistikProps> = ({ judul, nilai, Ikon, warnaKelas }) => {
   return (
-    <div className='bg-white rounded-lg'>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "48px 1fr",
-        gap: "1rem",
-        padding: "1rem",
-        alignItems: "center",
-      }}>
-        <div
-          className={`flex justify-center items-center ${classColor}`}
-          style={{ height: "48px", borderRadius: "10%" }}
-        >
-          {Icon}
+    <div className='bg-white rounded-lg shadow-md border border-gray-100 h-full'>
+      <div className='flex items-center p-4 gap-4'>
+        <div className={`flex justify-center items-center min-w-[48px] w-12 h-12 rounded-md ${warnaKelas}`}>
+          {Ikon}
         </div>
-        <div
-          className="hms-card-paraf"
-          style={{
-            height: "48px",
-            display: "grid",
-            gridTemplateRows: "32px 16px",
-            alignItems: "center",
-          }}
-        >
-          <span
-            className='text-sm font-semibold text-slate-600'
-          >
-            {title}
-          </span>
-          <span className='text-slate-800' style={{ fontSize: "24px", fontWeight: 600 }}>{value}</span>
+        <div className='flex flex-col justify-center'>
+          <span className='text-sm font-medium text-gray-500 mb-1'>{judul}</span>
+          <span className='text-2xl font-bold text-gray-800'>{nilai}</span>
         </div>
       </div>
     </div>
   )
 }
 
-
-const DashboardStat = () => {
+const StatDashboard = () => {
   const { opnames, isLoading } = useOpname()
-  const { data: suppliers, isLoading: isLoadingSuppplier } = useSupplier()
+  const { suppliers, isLoading: isLoadingSuppplier } = useSupplier()
   const { stock, isLoading: isLoadingExpired } = useExpired();
-  const {order, isLoading: isLoadingOrder} = useOrder()
+  const { order, isLoading: isLoadingOrder } = useOrder()
 
-  const stats = [
+  const statistik = [
     {
-      title: 'Total Penjualan',
-      classColor: 'bg-slate-200/30 text-primary',
-      Icon: <IoStorefrontSharp size={24} />,
-      value: isLoadingOrder ? 0 : order.length
+      judul: 'Total Penjualan',
+      warnaKelas: 'bg-blue-100 text-blue-600',
+      Ikon: <IoStorefrontSharp size={24} />,
+      nilai: isLoadingOrder ? 0 : order?.length || 0
     },
     {
-      title: 'Total Supplier',
-      classColor: 'bg-slate-200/30 text-primary',
-      Icon: <FaTruck size={24} />,
-      value: isLoadingSuppplier ? 0 : suppliers.length
+      judul: 'Total Pemasok',
+      warnaKelas: 'bg-orange-100 text-orange-600',
+      Ikon: <FaTruck size={24} />,
+      nilai: isLoadingSuppplier ? 0 : suppliers?.length || 0
     },
     {
-      title: 'Stok Opname',
-      classColor: 'bg-slate-200/30 text-primary',
-      Icon: <MdInventory size={24} />,
-      value: isLoading ? 0 : opnames.length
+      judul: 'Stok Opname',
+      warnaKelas: 'bg-green-100 text-green-600',
+      Ikon: <MdInventory size={24} />,
+      nilai: isLoading ? 0 : opnames?.length || 0
     },
     {
-      title: 'Mendakati Kadaluarsa',
-      classColor: 'bg-slate-200/30 text-primary',
-      Icon: <GiMedicines size={24} />,
-      value: isLoadingExpired ? 0 : stock.length
+      judul: 'Mendekati Kedaluwarsa',
+      warnaKelas: 'bg-red-100 text-red-600',
+      Ikon: <GiMedicines size={24} />,
+      nilai: isLoadingExpired ? 0 : stock?.length || 0
     },
   ]
 
-  return <div
-    className='grid grid-cols-4 gap-4'
-  >
-    {stats.map(({ Icon, title, classColor, value }) => (
-      <Stat {...{ Icon, title, classColor, value }} key={title} />
-    ))}
-  </div>
+  return (
+    <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full'>
+      {statistik.map(({ Ikon, judul, warnaKelas, nilai }) => (
+        <Statistik {...{ Ikon, judul, warnaKelas, nilai }} key={judul} />
+      ))}
+    </div>
+  )
 }
 
-export default DashboardStat
+export default StatDashboard

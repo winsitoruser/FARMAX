@@ -1,38 +1,84 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Farmanesia Platform B2B ERP
 
-## Getting Started
+Proyek ini adalah implementasi frontend untuk Platform B2B ERP Farmanesia, menggunakan Next.js dengan TypeScript dan Tailwind CSS.
 
-First, run the development server:
+## Arsitektur Sistem
+
+Proyek ini mengimplementasikan arsitektur sistem Farmanesia yang terdiri dari beberapa lapisan:
+
+1. **Farmanesia Parent System**
+   - Admin Dashboard (Manajemen Mitra & Pelaporan Global)
+   - Monitoring Center (Pelacakan Aktivitas & Analitik Lintas Mitra)
+   - System Admin (Konfigurasi Tenant & Manajemen Akses)
+
+2. **Multi-tenant Management Layer**
+   - Tenant Router
+   - Role Manager
+   - API Gateway
+   - Data Aggregator
+
+3. **Partner ERP System Modules**
+   - **Core Modules**
+     - POS System
+     - Pharmacy
+     - Inventory
+     - Finance
+     - Procurement
+     - CRM
+     - Reports
+     - Compliance
+     - Admin
+   - **Multi-branch Management**
+     - Branch Admin
+     - Stock Transfer
+     - Permissions
+     - Cross Access
+     - Unified Sales
+     - Staff Management
+     - Branch Reports
+     - Role Matrix
+
+4. **Data Layer**
+   - Tenant Databases
+   - Consolidated Data Warehouse
+   - System Configuration Store
+
+5. **Integration Layer**
+   - BPJS/Asuransi
+   - BPOM
+   - Payment Gateway
+   - External Systems
+
+## Memulai Pengembangan
+
+Pertama, jalankan server pengembangan:
 
 ```bash
 npm run dev
-# or
+# atau
 yarn dev
-# or
+# atau
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000) dengan browser Anda untuk melihat hasilnya.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## Struktur Folder
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Proyek ini menggunakan struktur folder berikut:
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+- `/pages` - Halaman-halaman aplikasi
+- `/modules` - Modul-modul bisnis sesuai arsitektur sistem
+- `/components` - Komponen UI yang dapat digunakan kembali
+- `/hooks` - Custom React hooks
+- `/lib` - Utilitas dan fungsi-fungsi helper
+- `/public` - Aset statis seperti gambar dan ikon
+- `/styles` - File-file CSS global dan konfigurasi Tailwind
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Teknologi yang Digunakan
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- Next.js
+- TypeScript
+- Tailwind CSS
+- React
+- ShadcnUI
