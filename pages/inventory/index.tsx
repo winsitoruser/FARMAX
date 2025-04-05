@@ -310,6 +310,77 @@ const mockSupplierTransactions = {
   ],
 };
 
+// Data untuk pie chart kategori produk
+const recentActivities = [
+  {
+    id: 'act001',
+    date: new Date('2024-04-04T14:30:00'),
+    type: 'order',
+    productName: 'Paracetamol 500mg',
+    quantity: 100,
+    unit: 'Box',
+    supplier: 'PT Kimia Farma',
+    status: 'pending',
+    poNumber: 'PO-2024-042'
+  },
+  {
+    id: 'act002',
+    date: new Date('2024-04-03T10:15:00'),
+    type: 'received',
+    productName: 'Vitamin C 1000mg',
+    quantity: 50,
+    unit: 'Box',
+    supplier: 'PT Dexa Medica',
+    status: 'complete',
+    poNumber: 'PO-2024-038'
+  },
+  {
+    id: 'act003',
+    date: new Date('2024-04-02T16:45:00'),
+    type: 'returned',
+    productName: 'Amoxicillin 500mg',
+    quantity: 10,
+    unit: 'Box',
+    supplier: 'PT Kalbe Farma',
+    reason: 'Kemasan rusak',
+    status: 'complete',
+    returnNumber: 'RET-2024-012'
+  },
+  {
+    id: 'act004',
+    date: new Date('2024-04-02T09:30:00'),
+    type: 'received',
+    productName: 'Cetirizine 10mg',
+    quantity: 30,
+    unit: 'Box',
+    supplier: 'PT Sanbe Farma',
+    status: 'complete',
+    poNumber: 'PO-2024-037'
+  },
+  {
+    id: 'act005',
+    date: new Date('2024-04-01T13:20:00'),
+    type: 'order',
+    productName: 'Ibuprofen 400mg',
+    quantity: 40,
+    unit: 'Box',
+    supplier: 'PT Phapros',
+    status: 'pending',
+    poNumber: 'PO-2024-041'
+  }
+];
+
+// Format tanggal lengkap dengan waktu
+const formatDateTime = (date: Date) => {
+  return new Date(date).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 const InventoryPage: React.FC = () => {
   const { toast } = useToast();
   
@@ -384,6 +455,26 @@ const InventoryPage: React.FC = () => {
       count: products.filter(p => p.category === cat).length
     };
   }).sort((a, b) => b.count - a.count);
+
+  const categoryChartData = categoryCounts.map((cat: { name: string; count: number }, index: number) => {
+    // Generate warna yang berbeda untuk setiap kategori
+    const colors = [
+      '#F97316', // orange-500
+      '#F59E0B', // amber-500
+      '#D97706', // amber-600
+      '#EA580C', // orange-600
+      '#FB923C', // orange-400
+      '#FDBA74', // orange-300
+      '#FCD34D', // amber-300
+      '#FBBF24', // amber-400
+    ];
+    
+    return {
+      name: cat.name,
+      value: cat.count,
+      color: colors[index % colors.length]
+    };
+  });
 
   // Helper function to calculate days until expiry
   const getDaysUntilExpiry = (expiryDate: Date) => {
@@ -743,18 +834,18 @@ const InventoryPage: React.FC = () => {
         
         {/* Card untuk Pie Chart dan Produk Stok Rendah */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
-          {/* Card untuk Pie Chart Kadaluarsa */}
+          {/* Card untuk Pie Chart Kategori Produk */}
           <Card className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow">
             <div className="h-1.5 bg-gradient-to-r from-orange-500 to-amber-500"></div>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center">
                 <div className="bg-orange-100 p-2 rounded-full mr-3">
-                  <FaCalendarAlt className="h-4 w-4 text-orange-600" />
+                  <FaLayerGroup className="h-4 w-4 text-orange-600" />
                 </div>
-                Status Kadaluarsa Produk
+                Kategori Produk
               </CardTitle>
               <CardDescription>
-                Perbandingan produk berdasarkan status kadaluarsa
+                Distribusi produk berdasarkan kategori
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -762,44 +853,28 @@ const InventoryPage: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={expiryChartData}
+                      data={categoryChartData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
                       outerRadius={90}
                       paddingAngle={2}
                       dataKey="value"
+                      label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      labelLine={false}
                     >
-                      {expiryChartData.map((entry, index) => (
+                      {categoryChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Legend 
-                      layout="vertical" 
-                      verticalAlign="middle" 
-                      align="right"
-                      formatter={(value, entry, index) => (
-                        <span className="text-sm text-gray-700">{value}</span>
-                      )}
-                    />
                     <Tooltip 
                       formatter={(value) => [`${value} produk`, 'Jumlah']}
-                      labelFormatter={(label) => ''}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="text-xs text-gray-500 mt-2 text-center">
-                {expired > 0 && (
-                  <span className="text-red-600 font-medium mr-2">
-                    {expired} produk sudah kadaluarsa
-                  </span>
-                )}
-                {expiringSoon > 0 && (
-                  <span className="text-amber-600 font-medium">
-                    {expiringSoon} produk akan kadaluarsa dalam 1 bulan
-                  </span>
-                )}
+              <div className="mt-2 text-xs text-gray-500 text-center">
+                Total {products.length} produk dalam {categories.length} kategori
               </div>
             </CardContent>
           </Card>
@@ -1114,47 +1189,47 @@ const InventoryPage: React.FC = () => {
                     </CardContent>
                   </Card>
                   
-                  {/* Transaksi Terbaru */}
+                  {/* Aktivitas Produk Terbaru */}
                   <Card className="border shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base font-medium flex items-center">
                         <FaExchangeAlt className="mr-2 h-4 w-4 text-orange-500" />
-                        Transaksi Terbaru
+                        Aktivitas Produk Terbaru
                       </CardTitle>
                       <CardDescription>
-                        5 transaksi inventori terbaru
+                        5 aktivitas produk terbaru
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {mockTransactions.slice(0, 5).map((transaction) => (
-                          <div key={transaction.id} className="flex items-center py-1 border-b border-gray-100 last:border-0">
+                        {recentActivities.slice(0, 5).map((activity) => (
+                          <div key={activity.id} className="flex items-center py-1 border-b border-gray-100 last:border-0">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              transaction.type === 'Penjualan' 
-                                ? 'bg-red-100 text-red-600' 
-                                : transaction.type === 'Pembelian' 
+                              activity.type === 'order' 
+                                ? 'bg-blue-100 text-blue-600' 
+                                : activity.type === 'received' 
                                   ? 'bg-green-100 text-green-600'
-                                  : 'bg-blue-100 text-blue-600'
+                                  : 'bg-amber-100 text-amber-600'
                             }`}>
-                              {transaction.type === 'Penjualan' 
-                                ? <FaArrowUp className="h-3 w-3" /> 
-                                : transaction.type === 'Pembelian' 
-                                  ? <FaArrowDown className="h-3 w-3" />
+                              {activity.type === 'order' 
+                                ? <FaShoppingCart className="h-3 w-3" /> 
+                                : activity.type === 'received' 
+                                  ? <FaCheckCircle className="h-3 w-3" />
                                   : <FaExchangeAlt className="h-3 w-3" />
                               }
                             </div>
                             <div className="ml-3 flex-1">
-                              <div className="text-sm font-medium text-gray-900">{transaction.productName}</div>
+                              <div className="text-sm font-medium text-gray-900">{activity.productName}</div>
                               <div className="text-xs text-gray-500 flex items-center">
-                                <span className="capitalize">{transaction.type}</span>
+                                <span className="capitalize">{activity.type}</span>
                                 <span className="inline-block h-1 w-1 rounded-full bg-gray-400 mx-1.5"></span>
-                                <span>{new Date(transaction.date).toLocaleDateString('id-ID')}</span>
+                                <span>{formatDateTime(activity.date)}</span>
                               </div>
                             </div>
                             <div className="text-right">
                               <div className="mr-4">
-                                <div className="text-orange-700 font-medium">{transaction.quantity}</div>
-                                <div className="text-xs text-gray-500">{formatRupiah(transaction.total)}</div>
+                                <div className="text-orange-700 font-medium">{activity.quantity}</div>
+                                <div className="text-xs text-gray-500">{activity.unit}</div>
                               </div>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700">
                                 <FaEye className="h-4 w-4" />
@@ -1165,7 +1240,7 @@ const InventoryPage: React.FC = () => {
                       </div>
                       <div className="mt-3 text-center">
                         <Button variant="link" className="text-orange-600 hover:text-orange-700 text-sm">
-                          Lihat semua transaksi
+                          Lihat semua aktivitas
                         </Button>
                       </div>
                     </CardContent>

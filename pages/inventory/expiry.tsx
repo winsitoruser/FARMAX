@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NextPage } from "next";
 import Head from 'next/head';
 import InventoryLayout from "@/components/layouts/inventory-layout";
@@ -47,10 +47,49 @@ import {
   FaArrowRight,
   FaTrash,
   FaExclamationTriangle,
-  FaDownload
+  FaDownload,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaUserAlt,
+  FaCalendarAlt,
+  FaBoxOpen,
+  FaWarehouse,
+  FaHistory,
+  FaThList,
+  FaInfoCircle,
+  FaClipboardList
 } from "react-icons/fa";
-import { mockProducts, mockStocks } from "@/modules/inventory/types";
-import { formatRupiah } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Toast,
+  ToastAction,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+} from "@/components/ui/toast";
+import { useToast } from "@/components/ui/use-toast"; 
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toaster } from "@/components/ui/toaster"; 
+
+// Helper function to format currency
+const formatRupiah = (amount: number) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0
+  }).format(amount);
+};
 
 // Helper function to calculate days between dates
 const getDaysBetween = (date1: Date, date2: Date) => {
@@ -147,11 +186,92 @@ const generateMockExpiryData = (): ExpiryItem[] => {
 
 const mockExpiryData = generateMockExpiryData();
 
+// Interface for order history
+interface OrderHistory {
+  id: string;
+  orderDate: Date;
+  orderNumber: string;
+  quantity: number;
+  staff: {
+    id: string;
+    name: string;
+    avatar: string;
+    position: string;
+  };
+}
+
+// Generate mock order history
+const generateOrderHistory = (productId: string): OrderHistory[] => {
+  const staffMembers = [
+    { id: "staff1", name: "Budi Santoso", avatar: "", position: "Senior Apoteker" },
+    { id: "staff2", name: "Ani Wijaya", avatar: "", position: "Apoteker" },
+    { id: "staff3", name: "Dedi Kurniawan", avatar: "", position: "Asisten Apoteker" },
+    { id: "staff4", name: "Siti Rahayu", avatar: "", position: "Staff Gudang" },
+  ];
+
+  const numberOfOrders = Math.floor(Math.random() * 5) + 1;
+  const orders: OrderHistory[] = [];
+
+  for (let i = 0; i < numberOfOrders; i++) {
+    const orderDate = new Date();
+    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 60) - 5);
+    
+    const randomStaff = staffMembers[Math.floor(Math.random() * staffMembers.length)];
+    
+    orders.push({
+      id: `order-${productId}-${i}`,
+      orderDate,
+      orderNumber: `PO-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+      quantity: Math.floor(Math.random() * 50) + 5,
+      staff: randomStaff
+    });
+  }
+
+  return orders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+};
+
 const ExpiryPage: NextPage = () => {
   // Filter states
   const [filter, setFilter] = useState<string>("all"); // all, expired, critical, warning, good
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("expiry-asc"); // expiry-asc, expiry-desc, name, value-desc
+  
+  // Modal states
+  const [selectedProduct, setSelectedProduct] = useState<ExpiryItem | null>(null);
+  const [productDetailOpen, setProductDetailOpen] = useState(false);
+  const [defectaDialogOpen, setDefectaDialogOpen] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
+  
+  // Toast hooks
+  const { toast } = useToast();
+
+  // Function to handle showing product detail
+  const handleShowProductDetail = (product: ExpiryItem) => {
+    setSelectedProduct(product);
+    // Generate order history for this product
+    setOrderHistory(generateOrderHistory(product.id));
+    setProductDetailOpen(true);
+  };
+
+  // Function to handle defecta confirmation
+  const handleDefectaConfirm = (product: ExpiryItem) => {
+    setSelectedProduct(product);
+    setDefectaDialogOpen(true);
+  };
+
+  // Function to handle defecta submission
+  const handleDefectaSubmit = () => {
+    if (selectedProduct) {
+      setDefectaDialogOpen(false);
+      
+      // Show success toast notification
+      toast({
+        title: "Permintaan Berhasil!",
+        description: "Produk telah ditambahkan ke daftar defecta.",
+        variant: "default",
+      });
+    }
+  };
   
   // Function to filter data based on status
   const getFilteredData = () => {
@@ -483,6 +603,7 @@ const ExpiryPage: NextPage = () => {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                              onClick={() => handleShowProductDetail(item)}
                             >
                               <FaEye className="h-4 w-4" />
                             </Button>
@@ -490,6 +611,7 @@ const ExpiryPage: NextPage = () => {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-green-600 hover:text-green-800 hover:bg-green-50"
+                              onClick={() => handleDefectaConfirm(item)}
                             >
                               <FaTag className="h-4 w-4" />
                             </Button>
@@ -527,9 +649,246 @@ const ExpiryPage: NextPage = () => {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Product Detail Dialog */}
+        <Dialog open={productDetailOpen} onOpenChange={setProductDetailOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center">
+                <FaBoxOpen className="mr-2 text-orange-500" /> Detail Produk
+              </DialogTitle>
+              <DialogDescription>
+                Informasi lengkap produk dan riwayat pemesanan
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedProduct && (
+              <div className="space-y-6">
+                {/* Product Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="border-orange-200">
+                    <CardHeader className="bg-orange-50 border-b border-orange-100">
+                      <CardTitle className="text-lg text-orange-800 flex items-center">
+                        <FaInfoCircle className="mr-2" /> Informasi Produk
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{selectedProduct.productName}</h3>
+                        <p className="text-sm text-gray-500">SKU: {selectedProduct.sku}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500">Batch</p>
+                          <p className="font-medium">{selectedProduct.batchNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Stok</p>
+                          <p className="font-medium">{selectedProduct.currentStock} unit</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Kadaluarsa</p>
+                          <p className="font-medium">{formatDate(selectedProduct.expiryDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Status</p>
+                          <div>{getStatusBadge(selectedProduct.status, selectedProduct.daysRemaining)}</div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs text-gray-500">Nilai</p>
+                        <p className="font-medium">{formatRupiah(selectedProduct.value)}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-gray-500">Lokasi Penyimpanan</p>
+                        <p className="font-medium">Rak B23, Gudang Utama</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="border-blue-200">
+                    <CardHeader className="bg-blue-50 border-b border-blue-100">
+                      <CardTitle className="text-lg text-blue-800 flex items-center">
+                        <FaClipboardList className="mr-2" /> Data Tambahan
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                      <div>
+                        <p className="text-xs text-gray-500">Kategori</p>
+                        <p className="font-medium">Obat Keras</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs text-gray-500">Supplier</p>
+                        <p className="font-medium">PT Kimia Farma</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs text-gray-500">Harga Beli</p>
+                        <p className="font-medium">{formatRupiah(selectedProduct.value / selectedProduct.currentStock)}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs text-gray-500">Harga Jual</p>
+                        <p className="font-medium">{formatRupiah((selectedProduct.value / selectedProduct.currentStock) * 1.2)}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-xs text-gray-500">Minimum Stok</p>
+                        <p className="font-medium">10 unit</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Order History */}
+                <Card className="border-green-200">
+                  <CardHeader className="bg-green-50 border-b border-green-100">
+                    <CardTitle className="text-lg text-green-800 flex items-center">
+                      <FaHistory className="mr-2" /> Riwayat Pemesanan
+                    </CardTitle>
+                  </CardHeader>
+                  <ScrollArea className="h-[200px]">
+                    <CardContent className="p-4">
+                      {orderHistory.length === 0 ? (
+                        <div className="text-center text-gray-500 py-6">
+                          Tidak ada riwayat pemesanan
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {orderHistory.map((order, index) => (
+                            <div key={order.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium">{order.orderNumber}</p>
+                                  <p className="text-sm text-gray-500">
+                                    <FaCalendarAlt className="inline-block mr-1" /> 
+                                    {formatDate(order.orderDate)}
+                                  </p>
+                                  <p className="text-sm">Jumlah: {order.quantity} unit</p>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <div className="text-right">
+                                    <div className="flex items-center justify-end">
+                                      <FaUserAlt className="mr-1 text-gray-400" />
+                                      <p className="font-medium">{order.staff.name}</p>
+                                    </div>
+                                    <p className="text-xs text-gray-500">{order.staff.position}</p>
+                                  </div>
+                                  <Avatar className="h-9 w-9">
+                                    <AvatarImage src={order.staff.avatar} alt={order.staff.name} />
+                                    <AvatarFallback className="bg-orange-100 text-orange-800">
+                                      {order.staff.name.split(' ').map(n => n[0]).join('')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </ScrollArea>
+                </Card>
+                
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setProductDetailOpen(false)}
+                  >
+                    Tutup
+                  </Button>
+                  <Button
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                    onClick={() => {
+                      setProductDetailOpen(false);
+                      handleDefectaConfirm(selectedProduct);
+                    }}
+                  >
+                    <FaTag className="mr-2" />
+                    Tambahkan ke Defecta
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+        
+        {/* Defecta Confirmation Dialog */}
+        <Dialog open={defectaDialogOpen} onOpenChange={setDefectaDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center">
+                <FaExclamationTriangle className="mr-2 text-amber-500" /> Konfirmasi Defecta
+              </DialogTitle>
+              <DialogDescription>
+                Apakah Anda yakin ingin menambahkan produk ini ke daftar defecta?
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedProduct && (
+              <div className="py-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+                  <div className="flex items-start space-x-4">
+                    <div className="shrink-0">
+                      <div className="bg-amber-100 p-2 rounded-full">
+                        <FaBoxOpen className="h-6 w-6 text-amber-600" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{selectedProduct.productName}</h3>
+                      <div className="text-sm text-gray-500 space-y-1 mt-1">
+                        <p>SKU: {selectedProduct.sku}</p>
+                        <p>Batch: {selectedProduct.batchNumber}</p>
+                        <p>Kadaluarsa: {formatDate(selectedProduct.expiryDate)}</p>
+                        <p>Stok: {selectedProduct.currentStock} unit</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600">
+                  Setelah ditambahkan ke daftar defecta, produk ini akan diberi tanda untuk penggantian atau pengembalian ke supplier.
+                </p>
+              </div>
+            )}
+            
+            <DialogFooter className="flex space-x-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setDefectaDialogOpen(false)}
+              >
+                <FaTimesCircle className="mr-2" />
+                Batal
+              </Button>
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleDefectaSubmit}
+              >
+                <FaCheckCircle className="mr-2" />
+                Ya, Tambahkan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Toast Provider for notifications */}
+        <Toaster />
       </div>
     </InventoryLayout>
   );
 };
 
-export default ExpiryPage;
+// Wrap the page component with ToastProvider
+const ExpiryPageWithToast: NextPage = () => {
+  return (
+    <ToastProvider>
+      <ExpiryPage />
+    </ToastProvider>
+  );
+};
+
+export default ExpiryPageWithToast;

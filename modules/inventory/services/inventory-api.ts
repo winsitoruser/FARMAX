@@ -24,6 +24,9 @@ export interface Product {
   isActive: boolean;
   location?: string;
   batchNumber?: string;
+  drugClassification?: 'FREE' | 'LIMITED_FREE' | 'PRESCRIPTION' | 'PSYCHOTROPIC' | 'NARCOTICS';
+  requiresPrescription?: boolean;
+  storageRequirements?: string;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -88,10 +91,14 @@ class InventoryAPIService {
     limit?: number; 
     search?: string;
     category?: string;
+    supplier?: string;
+    manufacturer?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     isActive?: boolean;
     lowStock?: boolean;
+    outOfStock?: boolean;
+    drugClassification?: string;
     nearExpiry?: boolean;
   }): Promise<{ data: Product[]; total: number; page: number; totalPages: number }> {
     try {

@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { DrugClassification, getDrugClassInfo } from "../utils/drug-classifications";
 
 // Mock data untuk unit produk
 const mockProductUnits = [
@@ -83,7 +84,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel }
     },
     prices: product?.prices || {},
     manufacturerId: product?.manufacturerId || "",
-    supplierId: product?.supplierId || ""
+    supplierId: product?.supplierId || "",
+    drugClassification: product?.drugClassification || "",
+    requiresPrescription: product?.requiresPrescription || false
   };
 
   const [formData, setFormData] = useState<Product>(initialFormState);
@@ -281,6 +284,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel }
           <TabsTrigger value="general" className="text-xs">Informasi Umum</TabsTrigger>
           <TabsTrigger value="packaging" className="text-xs">Kemasan & Satuan</TabsTrigger>
           <TabsTrigger value="pricing" className="text-xs">Harga</TabsTrigger>
+          <TabsTrigger value="regulation" className="text-xs">Regulasi</TabsTrigger>
           <TabsTrigger value="details" className="text-xs">Detail Tambahan</TabsTrigger>
         </TabsList>
         
@@ -770,6 +774,107 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel }
               ))}
             </div>
           </div>
+        </TabsContent>
+        
+        {/* Tab Content: Regulasi */}
+        <TabsContent value="regulation" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Informasi Regulasi</CardTitle>
+                  <CardDescription>
+                    Atur informasi regulasi obat seperti golongan obat dan persyaratan penjualan
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Golongan Obat */}
+              <div className="space-y-1.5">
+                <div className="flex items-center">
+                  <Label htmlFor="drugClassification" className="text-base font-medium mr-2">
+                    Golongan Obat
+                  </Label>
+                  <FaInfoCircle className="text-gray-400 hover:text-gray-600 cursor-help h-4 w-4" 
+                    title="Pilih golongan obat sesuai regulasi BPOM Indonesia" />
+                </div>
+                
+                <Select
+                  value={formData.drugClassification || ""}
+                  onValueChange={(value) => handleSelectChange("drugClassification", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Golongan Obat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Tidak Diklasifikasi</SelectItem>
+                    <SelectItem value={DrugClassification.FREE}>
+                      Obat Bebas (Lingkaran Hijau)
+                    </SelectItem>
+                    <SelectItem value={DrugClassification.LIMITED_FREE}>
+                      Obat Bebas Terbatas (Lingkaran Biru)
+                    </SelectItem>
+                    <SelectItem value={DrugClassification.PRESCRIPTION}>
+                      Obat Keras (Lingkaran Merah K)
+                    </SelectItem>
+                    <SelectItem value={DrugClassification.PSYCHOTROPIC}>
+                      Obat Psikotropika (Tanda +)
+                    </SelectItem>
+                    <SelectItem value={DrugClassification.NARCOTICS}>
+                      Obat Narkotika (Tanda +)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {formData.drugClassification && (
+                  <div className="mt-2 p-3 bg-orange-50 rounded-md border border-orange-200">
+                    <p className="text-sm text-orange-700">
+                      <span className="font-medium mr-2">Persyaratan:</span>
+                      {getDrugClassInfo(formData.drugClassification)?.saleRequirements || "Tidak ada persyaratan khusus"}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Resep Wajib */}
+              <div className="flex items-start space-x-3 p-4 border rounded-md">
+                <div className="flex-1">
+                  <Label htmlFor="requiresPrescription" className="text-base font-medium">
+                    Wajib Resep Dokter
+                  </Label>
+                  <p className="text-sm text-gray-500">
+                    Produk ini memerlukan resep dokter untuk penjualan
+                  </p>
+                </div>
+                <Switch
+                  id="requiresPrescription"
+                  checked={formData.requiresPrescription || false}
+                  onCheckedChange={(checked) => {
+                    setFormData({
+                      ...formData,
+                      requiresPrescription: checked
+                    });
+                  }}
+                />
+              </div>
+              
+              {/* Persyaratan Penyimpanan */}
+              <div className="space-y-1.5">
+                <Label htmlFor="storageRequirements" className="text-base font-medium">
+                  Persyaratan Penyimpanan
+                </Label>
+                <Textarea
+                  id="storageRequirements"
+                  name="storageRequirements"
+                  value={formData.storageRequirements || ""}
+                  onChange={handleChange}
+                  placeholder="Contoh: Simpan pada suhu ruangan, hindari sinar matahari langsung"
+                  className="h-24"
+                />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
         
         {/* Tab Content: Detail Tambahan */}

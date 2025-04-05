@@ -515,19 +515,17 @@ const ProductsPage: NextPage = () => {
 
       {/* Product Detail Modal */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-gray-800">Detail Produk</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Informasi lengkap tentang produk yang dipilih.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[85vw] p-0 bg-transparent border-0 shadow-none">
           {selectedProduct && (
-            <ProductDetail product={selectedProduct} onClose={() => setIsDetailModalOpen(false)} />
+            <ProductDetail 
+              product={selectedProduct} 
+              onClose={handleDetailClose} 
+              onEdit={(product) => {
+                handleDetailClose();
+                handleEdit(product);
+              }}
+            />
           )}
-          <DialogFooter>
-            <Button onClick={handleDetailClose}>Tutup</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -4,6 +4,7 @@ import Head from "next/head";
 import Link from "next/link";
 import InventoryPageLayout from "@/modules/inventory/components/InventoryPageLayout";
 import { useToast } from "@/components/ui/use-toast";
+import PrintableReturnInvoice from "@/modules/inventory/components/PrintableReturnInvoice";
 import {
   Card,
   CardContent,
@@ -345,10 +346,57 @@ const ReturnsPage: NextPage = () => {
   // Handle print invoice
   const handlePrintInvoice = (id: string) => {
     // Find the return data
-    const returnData = mockHistoryReturns.find(item => item.id === id);
+    let returnData;
+    if (activeTab === 'history') {
+      returnData = mockHistoryReturns.find(item => item.id === id);
+    } else {
+      returnData = mockPendingReturns.find(item => item.id === id);
+    }
+    
     if (returnData) {
+      // Create mock items if they don't exist
+      if (!returnData.items) {
+        returnData = {
+          ...returnData,
+          items: [
+            {
+              id: "item001",
+              name: "Paracetamol 500mg",
+              detail: "Tab 100's",
+              batch: "BN012345",
+              expDate: "2025-12-31",
+              quantity: 3,
+              unitPrice: 400000,
+              total: 1200000,
+              condition: "damaged",
+              reason: "Kemasan rusak"
+            },
+            {
+              id: "item002",
+              name: "Amoxicillin 500mg",
+              detail: "Cap 100's",
+              batch: "BN023456",
+              expDate: "2025-10-15", 
+              quantity: 2,
+              unitPrice: 525000,
+              total: 1050000,
+              condition: "expired",
+              reason: "Mendekati kedaluwarsa"
+            }
+          ],
+          supplierAddress: "Jl. Industri Farmasi No. 123, Jakarta",
+          approvedBy: "Dr. Budi Santoso",
+          createdBy: "Admin Sistem"
+        };
+      }
       setInvoiceData(returnData);
       setShowInvoicePDF(true);
+    } else {
+      toast({
+        title: "Data tidak ditemukan",
+        description: "Data retur tidak ditemukan",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1701,113 +1749,10 @@ const ReturnsPage: NextPage = () => {
             
             {/* Modal untuk tampilan PDF faktur retur */}
             {showInvoicePDF && invoiceData && (
-              <Dialog open={showInvoicePDF} onOpenChange={setShowInvoicePDF}>
-                <DialogContent className="max-w-4xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-lg flex items-center">
-                      <FaFileInvoice className="mr-2 h-5 w-5 text-orange-500" />
-                      Dokumen Retur #{invoiceData.id}
-                    </DialogTitle>
-                    <DialogDescription>
-                      Detail retur untuk {invoiceData.supplier}
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="p-4 bg-white border rounded-lg">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-xl font-bold mb-1">Farmanesia</h3>
-                        <p className="text-sm text-gray-500">Jl. Pharmacy No. 123</p>
-                        <p className="text-sm text-gray-500">Jakarta, Indonesia</p>
-                        <p className="text-sm text-gray-500">Tel: (021) 123-4567</p>
-                      </div>
-                      <div className="text-right">
-                        <h4 className="text-xl font-bold mb-1 text-orange-600">FORMULIR RETUR</h4>
-                        <p className="text-sm text-gray-500">No: {invoiceData.returnNumber}</p>
-                        <p className="text-sm text-gray-500">Tanggal: {new Date(invoiceData.date).toLocaleDateString('id-ID')}</p>
-                      </div>
-                    </div>
-                    
-                    <Separator className="my-4" />
-                    
-                    <div className="grid grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <h5 className="font-medium text-gray-800 mb-2">Supplier:</h5>
-                        <p className="text-sm">{invoiceData.supplier}</p>
-                      </div>
-                      <div>
-                        <h5 className="font-medium text-gray-800 mb-2">Alasan Retur:</h5>
-                        <p className="text-sm">{invoiceData.reason}</p>
-                      </div>
-                    </div>
-                    
-                    <Table>
-                      <TableHeader className="bg-orange-50">
-                        <TableRow>
-                          <TableHead>No.</TableHead>
-                          <TableHead>Deskripsi</TableHead>
-                          <TableHead className="text-center">Jumlah</TableHead>
-                          <TableHead className="text-right">Harga Satuan</TableHead>
-                          <TableHead className="text-right">Subtotal</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>1</TableCell>
-                          <TableCell>
-                            <div className="font-medium">Paracetamol 500mg Tab 100's</div>
-                            <div className="text-xs text-gray-500">Batch: BN012345</div>
-                          </TableCell>
-                          <TableCell className="text-center">3</TableCell>
-                          <TableCell className="text-right">{formatRupiah(400000)}</TableCell>
-                          <TableCell className="text-right">{formatRupiah(1200000)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell>2</TableCell>
-                          <TableCell>
-                            <div className="font-medium">Amoxicillin 500mg Cap 100's</div>
-                            <div className="text-xs text-gray-500">Batch: BN023456</div>
-                          </TableCell>
-                          <TableCell className="text-center">2</TableCell>
-                          <TableCell className="text-right">{formatRupiah(525000)}</TableCell>
-                          <TableCell className="text-right">{formatRupiah(1050000)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                      <TableFooter className="bg-gray-50">
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-right font-medium">Total</TableCell>
-                          <TableCell className="text-right font-bold">{formatRupiah(invoiceData.totalValue)}</TableCell>
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
-                    
-                    <div className="grid grid-cols-3 gap-6 mt-8">
-                      <div className="border-t border-gray-200 pt-4 text-center">
-                        <p className="text-sm text-gray-600 mb-12">Dibuat Oleh</p>
-                        <p className="font-medium">Admin Farmasi</p>
-                      </div>
-                      <div className="border-t border-gray-200 pt-4 text-center">
-                        <p className="text-sm text-gray-600 mb-12">Diperiksa Oleh</p>
-                        <p className="font-medium">Supervisor</p>
-                      </div>
-                      <div className="border-t border-gray-200 pt-4 text-center">
-                        <p className="text-sm text-gray-600 mb-12">Disetujui Oleh</p>
-                        <p className="font-medium">Manager Apotek</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setShowInvoicePDF(false)}>
-                      Tutup
-                    </Button>
-                    <Button className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white">
-                      <FaPrint className="mr-2 h-4 w-4" />
-                      Cetak
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <PrintableReturnInvoice 
+                data={invoiceData} 
+                onClose={() => setShowInvoicePDF(false)}
+              />
             )}
           </TabsContent>
         </Tabs>

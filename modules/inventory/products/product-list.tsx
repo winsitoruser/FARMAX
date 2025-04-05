@@ -40,9 +40,82 @@ import {
   FaEye,
   FaExclamationTriangle,
   FaCalendarAlt,
+  FaFileExcel,
+  FaFilePdf,
+  FaFileDownload,
+  FaPills,
 } from "react-icons/fa";
 import { formatRupiah } from "@/lib/utils";
 import { inventoryAPI, Product } from "../services/inventory-api";
+import { exportProductsToExcel } from "../utils/exportUtils";
+import { 
+  DrugClassification, 
+  getDrugClassInfo, 
+  getDrugClassBadgeStyles 
+} from "../utils/drug-classifications";
+
+// Komponen untuk menampilkan simbol klasifikasi obat
+const DrugClassificationSymbol = ({ 
+  classification, 
+  size = "sm" 
+}: { 
+  classification: string, 
+  size?: "sm" | "md" | "lg" 
+}) => {
+  const sizeClass = {
+    sm: "w-5 h-5",
+    md: "w-7 h-7",
+    lg: "w-10 h-10"
+  };
+
+  const getSymbolContent = () => {
+    switch (classification) {
+      case DrugClassification.FREE:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-green-500 flex items-center justify-center`} 
+               title="Obat Bebas">
+          </div>
+        );
+      case DrugClassification.LIMITED_FREE:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-blue-600 flex items-center justify-center`} 
+               title="Obat Bebas Terbatas">
+          </div>
+        );
+      case DrugClassification.PRESCRIPTION:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-red-500 flex items-center justify-center`} 
+               title="Obat Keras">
+            <span className="text-white font-bold" style={{ fontSize: size === "lg" ? "16px" : size === "md" ? "12px" : "9px" }}>K</span>
+          </div>
+        );
+      case DrugClassification.PSYCHOTROPIC:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-red-600 bg-white flex items-center justify-center`} 
+               title="Obat Psikotropika">
+            <span className="text-red-600 font-bold" style={{ fontSize: size === "lg" ? "20px" : size === "md" ? "16px" : "12px" }}>+</span>
+          </div>
+        );
+      case DrugClassification.NARCOTICS:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-red-600 bg-white flex items-center justify-center`} 
+               title="Obat Narkotika">
+            <span className="text-red-600 font-bold" style={{ fontSize: size === "lg" ? "20px" : size === "md" ? "16px" : "12px" }}>+</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!classification) return null;
+
+  return (
+    <div className="flex-shrink-0 inline-flex">
+      {getSymbolContent()}
+    </div>
+  );
+};
 
 export default function ProductList() {
   const router = useRouter();
@@ -60,10 +133,17 @@ export default function ProductList() {
     category: "",
     lowStock: false,
     nearExpiry: false,
+    supplier: "",
+    manufacturer: "",
+    stockRange: "all", // "all", "out", "low", "normal", "high"
+    drugClass: "", // Klasifikasi obat: FREE, LIMITED_FREE, PRESCRIPTION, dll
     sortBy: "name",
     sortOrder: "asc" as "asc" | "desc",
   });
   const [categories, setCategories] = useState<string[]>([]);
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [manufacturers, setManufacturers] = useState<string[]>([]);
+  const [showExportOptions, setShowExportOptions] = useState(false);
 
   useEffect(() => {
     // Fetch categories for filter dropdown
@@ -76,7 +156,38 @@ export default function ProductList() {
       }
     };
 
+    // Fetch suppliers and manufacturers for filter dropdowns
+    const fetchSupplierManufacturer = async () => {
+      try {
+        // In a real app, this would be API calls
+        // For now, we'll extract unique values from products
+        const allProductsResponse = await inventoryAPI.getProducts({
+          limit: 1000
+        });
+        
+        if (allProductsResponse && allProductsResponse.data) {
+          const uniqueSuppliers = [...new Set(
+            allProductsResponse.data
+              .map(p => p.supplier)
+              .filter(Boolean)
+          )];
+          
+          const uniqueManufacturers = [...new Set(
+            allProductsResponse.data
+              .map(p => p.manufacturer)
+              .filter(Boolean)
+          )];
+          
+          setSuppliers(uniqueSuppliers as string[]);
+          setManufacturers(uniqueManufacturers as string[]);
+        }
+      } catch (error) {
+        console.error("Error fetching suppliers/manufacturers:", error);
+      }
+    };
+
     fetchCategories();
+    fetchSupplierManufacturer();
   }, []);
 
   useEffect(() => {
@@ -89,8 +200,12 @@ export default function ProductList() {
           limit: pagination.limit,
           search: search,
           category: filter.category,
-          lowStock: filter.lowStock,
+          supplier: filter.supplier,
+          manufacturer: filter.manufacturer,
+          lowStock: filter.lowStock || filter.stockRange === "low",
+          outOfStock: filter.stockRange === "out",
           nearExpiry: filter.nearExpiry,
+          drugClassification: filter.drugClass || undefined,
           sortBy: filter.sortBy,
           sortOrder: filter.sortOrder,
         };
@@ -120,8 +235,12 @@ export default function ProductList() {
     pagination.limit,
     search,
     filter.category,
+    filter.supplier,
+    filter.manufacturer,
     filter.lowStock,
     filter.nearExpiry,
+    filter.stockRange,
+    filter.drugClass,
     filter.sortBy,
     filter.sortOrder,
   ]);
@@ -212,6 +331,72 @@ export default function ProductList() {
     return daysToExpiry <= 30; // Within 30 days
   };
 
+  // Export data to Excel
+  const handleExportToExcel = async () => {
+    try {
+      // Show loading indicator
+      setLoading(true);
+      
+      // Fetch all products for export (no pagination)
+      const allProductsResponse = await inventoryAPI.getProducts({
+        limit: 1000, // Set a high limit to get all products
+        sortBy: filter.sortBy,
+        sortOrder: filter.sortOrder,
+        category: filter.category,
+        supplier: filter.supplier,
+        manufacturer: filter.manufacturer,
+        lowStock: filter.lowStock || filter.stockRange === "low",
+        outOfStock: filter.stockRange === "out",
+        nearExpiry: filter.nearExpiry,
+        drugClassification: filter.drugClass || undefined,
+        search: search
+      });
+      
+      console.log("Exporting products:", allProductsResponse.data.length);
+      
+      // Check if we have products to export
+      if (!allProductsResponse.data || allProductsResponse.data.length === 0) {
+        alert("Tidak ada data produk untuk diekspor");
+        setLoading(false);
+        return;
+      }
+      
+      // Export the data
+      exportProductsToExcel(
+        allProductsResponse.data, 
+        `daftar-produk-farmax-${new Date().toISOString().split('T')[0]}.xlsx`
+      );
+      
+      // Close the export dropdown
+      setShowExportOptions(false);
+    } catch (error) {
+      console.error("Error exporting data to Excel:", error);
+      alert("Terjadi kesalahan saat mengekspor data ke Excel. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle export options dropdown
+  const toggleExportOptions = () => {
+    setShowExportOptions(!showExportOptions);
+  };
+
+  // Handle click outside to close export options
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('#export-options') && !target.closest('#export-options-button')) {
+        setShowExportOptions(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="space-y-6 p-6">
       {/* Header dengan gradien orange/amber */}
@@ -263,6 +448,62 @@ export default function ProductList() {
                   </SelectContent>
                 </Select>
 
+                <Select
+                  value={filter.supplier}
+                  onValueChange={(value) =>
+                    setFilter({ ...filter, supplier: value })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Semua Supplier</SelectItem>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier} value={supplier}>
+                        {supplier}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filter.manufacturer}
+                  onValueChange={(value) =>
+                    setFilter({ ...filter, manufacturer: value })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Pabrikan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Semua Pabrikan</SelectItem>
+                    {manufacturers.map((manufacturer) => (
+                      <SelectItem key={manufacturer} value={manufacturer}>
+                        {manufacturer}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filter.stockRange}
+                  onValueChange={(value) =>
+                    setFilter({ ...filter, stockRange: value, lowStock: false })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Kondisi Stok" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Stok</SelectItem>
+                    <SelectItem value="out">Stok Habis</SelectItem>
+                    <SelectItem value="low">Stok Rendah</SelectItem>
+                    <SelectItem value="normal">Stok Normal</SelectItem>
+                    <SelectItem value="high">Stok Tinggi</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Button
                   variant={filter.lowStock ? "default" : "outline"}
                   className={
@@ -271,7 +512,7 @@ export default function ProductList() {
                       : "border-orange-200 text-orange-600"
                   }
                   onClick={() =>
-                    setFilter({ ...filter, lowStock: !filter.lowStock })
+                    setFilter({ ...filter, lowStock: !filter.lowStock, stockRange: "all" })
                   }
                 >
                   <FaExclamationTriangle className="mr-1 h-4 w-4" />
@@ -292,6 +533,25 @@ export default function ProductList() {
                   <FaCalendarAlt className="mr-1 h-4 w-4" />
                   <span className="hidden sm:inline">Mendekati Kadaluarsa</span>
                 </Button>
+
+                <Select
+                  value={filter.drugClass}
+                  onValueChange={(value) =>
+                    setFilter({ ...filter, drugClass: value })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Klasifikasi Obat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Semua Klasifikasi</SelectItem>
+                    <SelectItem value={DrugClassification.FREE}>Obat Bebas</SelectItem>
+                    <SelectItem value={DrugClassification.LIMITED_FREE}>Obat Bebas Terbatas</SelectItem>
+                    <SelectItem value={DrugClassification.PRESCRIPTION}>Obat Keras</SelectItem>
+                    <SelectItem value={DrugClassification.PSYCHOTROPIC}>Obat Psikotropika</SelectItem>
+                    <SelectItem value={DrugClassification.NARCOTICS}>Obat Narkotika</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -301,11 +561,54 @@ export default function ProductList() {
                   variant="destructive"
                   onClick={handleDeleteSelected}
                   disabled={loading}
+                  className="flex items-center gap-1"
                 >
-                  <FaTrash className="mr-1 h-4 w-4" />
-                  Hapus ({selectedProducts.length})
+                  <FaTrash className="h-4 w-4" />
+                  <span className="hidden md:inline">Hapus Terpilih</span>
                 </Button>
               )}
+
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  id="export-options-button"
+                  onClick={toggleExportOptions}
+                  className="flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-600 border-green-300"
+                >
+                  <FaFileDownload className="h-4 w-4" />
+                  <span className="hidden md:inline">Export</span>
+                </Button>
+                
+                {showExportOptions && (
+                  <div
+                    className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-md overflow-hidden z-50"
+                    id="export-options"
+                  >
+                    <div className="py-1">
+                      <Button 
+                        variant="ghost" 
+                        className="w-full flex justify-start px-4 py-2 text-sm hover:bg-green-50"
+                        onClick={handleExportToExcel}
+                      >
+                        <FaFileExcel className="h-4 w-4 mr-2 text-green-600" />
+                        Export ke Excel
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full flex justify-start px-4 py-2 text-sm hover:bg-red-50"
+                        onClick={() => {
+                          alert("Fitur export ke PDF akan segera tersedia");
+                          setShowExportOptions(false);
+                        }}
+                      >
+                        <FaFilePdf className="h-4 w-4 mr-2 text-red-600" />
+                        Export ke PDF
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button
                 className="bg-orange-600 hover:bg-orange-700 text-white"
@@ -389,6 +692,8 @@ export default function ProductList() {
                       )}
                     </div>
                   </TableHead>
+                  <TableHead>Kondisi Stok</TableHead>
+                  <TableHead>Klasifikasi</TableHead>
                   <TableHead
                     className="cursor-pointer"
                     onClick={() => handleSort("buyPrice")}
@@ -504,15 +809,42 @@ export default function ProductList() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">{product.code}</TableCell>
-                      <TableCell>{product.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {product.drugClassification && (
+                            <DrugClassificationSymbol classification={product.drugClassification} />
+                          )}
+                          <span>
+                            {product.name}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell>{product.category}</TableCell>
                       <TableCell>
-                        <div className="flex items-center">
-                          {product.stockQty}{" "}
-                          {isLowStock(product) && (
-                            <FaExclamationTriangle className="ml-1 text-yellow-500" />
-                          )}
-                        </div>
+                        {product.stockQty.toLocaleString('id-ID')} {product.unit}
+                      </TableCell>
+                      <TableCell>
+                        {product.stockQty === 0 ? (
+                          <Badge variant="destructive" className="bg-red-500">Habis</Badge>
+                        ) : product.stockQty <= product.minStockQty ? (
+                          <Badge variant="outline" className="border-yellow-500 text-yellow-700 bg-yellow-50">Rendah</Badge>
+                        ) : product.stockQty >= product.minStockQty * 3 ? (
+                          <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">Tinggi</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">Normal</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {product.drugClassification ? (
+                          <Badge className={`${getDrugClassBadgeStyles(product.drugClassification)} flex items-center gap-1`}>
+                            <FaPills className="h-3 w-3" />
+                            {getDrugClassInfo(product.drugClassification)?.name || product.drugClassification}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500 border-gray-300 bg-gray-50">
+                            Belum Diklasifikasi
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>{formatRupiah(product.buyPrice)}</TableCell>
                       <TableCell>{formatRupiah(product.sellPrice)}</TableCell>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
+import useSidebar from '@/hooks/use-sidebar';
 import { 
   FaSearch, 
   FaBell, 
@@ -32,8 +33,8 @@ import { Switch } from '@/components/ui/switch';
 
 interface PosNavbarProps {
   scrolled: boolean;
-  sidebarCollapsed: boolean;
-  toggleSidebar: () => void;
+  sidebarCollapsed?: boolean;
+  toggleSidebar?: () => void;
   showBilling?: boolean;
   showBusinessSettings?: boolean;
 }
@@ -41,12 +42,13 @@ interface PosNavbarProps {
 const PosNavbar: React.FC<PosNavbarProps> = ({ 
   scrolled = false, 
   sidebarCollapsed = true, 
-  toggleSidebar,
+  toggleSidebar = () => {}, 
   showBilling = true,
   showBusinessSettings = true
 }) => {
   const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
+  const { isOpen, toggle } = useSidebar();
   const [notifications, setNotifications] = useState([
     { id: 1, message: "Produk hampir kadaluarsa", time: "2 jam yang lalu", read: false, url: "/inventory/expiry" },
     { id: 2, message: "Stok obat sedang menipis", time: "6 jam yang lalu", read: false, url: "/inventory/products" },
@@ -266,10 +268,10 @@ const PosNavbar: React.FC<PosNavbarProps> = ({
             
             {/* Sidebar Toggle Button */}
             <button 
-              onClick={toggleSidebar}
+              onClick={toggle}
               className="flex items-center justify-center ml-2 w-9 h-9 rounded-lg text-gray-600 bg-gray-100 hover:bg-orange-50 hover:text-orange-500 transition-colors duration-200"
             >
-              {sidebarCollapsed ? <FaBars /> : <FaTimes />}
+              {isOpen ? <FaTimes /> : <FaBars />}
             </button>
           </div>
         </div>

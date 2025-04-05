@@ -30,6 +30,9 @@ export interface Product {
   };
   manufacturerId?: string;
   supplierId?: string;
+  drugClassification?: string;
+  requiresPrescription?: boolean;
+  storageRequirements?: string;
 }
 
 export interface Stock {

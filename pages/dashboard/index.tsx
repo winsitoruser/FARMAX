@@ -55,29 +55,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {stats.map((stat) => (
-            <Card key={stat.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow duration-200">
-              <div className="h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                    <h3 className="text-xl font-bold">{stat.value}</h3>
-                    <span className={`text-xs font-medium ${stat.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-                      {stat.change} dari kemarin
-                    </span>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-600 to-amber-500 p-2 rounded-lg shadow">
-                    {stat.icon}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         {/* Quick Access Menu */}
         <div className="mb-6">
           <h2 className="text-lg font-bold text-gray-800 mb-3">Akses Cepat</h2>

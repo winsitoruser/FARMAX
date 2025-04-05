@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatRupiah } from "@/lib/utils";
+import PrintableReceptionInvoice from "./PrintableReceptionInvoice";
 import { 
   FaFileInvoice, 
   FaBoxOpen, 
@@ -137,6 +138,7 @@ const ReceptionHistoryDetail: React.FC<ReceptionHistoryDetailProps> = ({ recepti
   // Dalam implementasi nyata, kita akan mengambil data berdasarkan receptionId
   // Untuk demo ini, kita gunakan data mock
   const [receptionData, setReceptionData] = useState<ReceptionHistory>(mockHistoryData);
+  const [showInvoice, setShowInvoice] = useState<boolean>(false);
 
   // Fungsi untuk memformat tanggal
   const formatDate = (dateString: string) => {
@@ -150,13 +152,17 @@ const ReceptionHistoryDetail: React.FC<ReceptionHistoryDetailProps> = ({ recepti
 
   // Fungsi untuk cetak
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
 
   // Fungsi untuk download
   const handleDownload = () => {
-    // Implementasi download PDF/Excel disini
-    alert("Download fitur akan diimplementasikan");
+    setShowInvoice(true);
+  };
+
+  // Fungsi untuk menutup invoice
+  const handleCloseInvoice = () => {
+    setShowInvoice(false);
   };
 
   // Mendapatkan warna berdasarkan status
@@ -454,6 +460,14 @@ const ReceptionHistoryDetail: React.FC<ReceptionHistoryDetailProps> = ({ recepti
           </CardContent>
         </div>
       </Card>
+      
+      {/* Invoice modal */}
+      {showInvoice && (
+        <PrintableReceptionInvoice 
+          data={receptionData} 
+          onClose={handleCloseInvoice} 
+        />
+      )}
     </div>
   );
 };

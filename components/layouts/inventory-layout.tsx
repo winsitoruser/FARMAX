@@ -3,6 +3,8 @@ import Footer from "@/components/shared/footer";
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import PosNavbar from '@/components/pos/pos-navbar';
+import CollapsedSidebar from '@/components/shared/collapsed-sidebar';
+import useSidebar from '@/hooks/use-sidebar';
 import { 
   FaBoxOpen, 
   FaClipboardList, 
@@ -22,7 +24,7 @@ const InventoryLayout = ({ children, showBackButton = true }: InventoryLayoutPro
   const router = useRouter();
   const currentPath = router.pathname;
   const [scrolled, setScrolled] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const { isOpen } = useSidebar();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -36,10 +38,6 @@ const InventoryLayout = ({ children, showBackButton = true }: InventoryLayoutPro
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
 
   const navItems = [
     { name: 'Beranda', path: '/inventory', icon: <FaHome className="w-4 h-4" /> },
@@ -56,16 +54,17 @@ const InventoryLayout = ({ children, showBackButton = true }: InventoryLayoutPro
       <div className="fixed top-0 right-0 left-0 z-50 bg-white shadow-sm">
         <div className="h-1.5 w-full bg-gradient-to-r from-orange-600 to-amber-500"></div>
         <PosNavbar 
-          scrolled={scrolled} 
-          sidebarCollapsed={sidebarCollapsed} 
-          toggleSidebar={toggleSidebar}
+          scrolled={scrolled}
           showBilling={true}
           showBusinessSettings={true}
         />
       </div>
       
+      {/* Collapsible Sidebar */}
+      <CollapsedSidebar />
+      
       {/* Content Area with padding-top to account for fixed header */}
-      <div className="flex flex-1 mt-[4.5rem]">
+      <div className={`flex flex-1 mt-[4.5rem] ${isOpen ? 'ml-56' : 'ml-16'} transition-all duration-300`}>
         {/* Main scrollable content */}
         <div className="flex-1 overflow-y-auto w-full">
           <div className="max-w-[1280px] mx-auto px-4 py-4 w-full">

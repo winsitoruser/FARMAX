@@ -20,11 +20,23 @@ import {
   FaSortDown,
   FaSearch,
   FaFilter,
-  FaShoppingCart
+  FaShoppingCart,
+  FaExclamationTriangle,
+  FaBell,
+  FaCheckCircle,
+  FaBoxOpen,
+  FaArrowRight
 } from "react-icons/fa";
-import { Product, mockCategories } from "../types";
+import { Product, mockCategories, mockStocks, mockProductConsumptionStats } from "../types";
 import { formatRupiah } from "@/lib/utils";
 import Image from "next/image";
+import { calculateAllStockMetrics } from "../utils/stockCalculations";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ProductTableProps {
   products: Product[];
@@ -49,53 +61,46 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Filter products based on search query
-  const filteredProducts = products.filter(
-    product =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.sku?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-      getCategoryName(product.categoryId)
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
-  );
+  // Filtered products based on search query
+  const filteredProducts = products.filter(product => {
+    const query = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      (product.sku && product.sku.toLowerCase().includes(query)) ||
+      getCategoryName(product.categoryId).toLowerCase().includes(query)
+    );
+  });
 
   // Sort products
   const sortedProducts = [...filteredProducts].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
+    if (!a[sortField] && !b[sortField]) return 0;
+    if (!a[sortField]) return 1;
+    if (!b[sortField]) return -1;
 
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      return sortDirection === "asc"
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    } else if (
-      (typeof aValue === "number" && typeof bValue === "number") ||
-      (typeof aValue === "undefined" && typeof bValue === "number") ||
-      (typeof aValue === "number" && typeof bValue === "undefined")
-    ) {
-      const numA = typeof aValue === "number" ? aValue : 0;
-      const numB = typeof bValue === "number" ? bValue : 0;
-      return sortDirection === "asc" ? numA - numB : numB - numA;
-    } else if (aValue instanceof Date && bValue instanceof Date) {
-      return sortDirection === "asc"
-        ? aValue.getTime() - bValue.getTime()
-        : bValue.getTime() - aValue.getTime();
+    const aValue = a[sortField]?.toString().toLowerCase() || '';
+    const bValue = b[sortField]?.toString().toLowerCase() || '';
+
+    if (sortDirection === "asc") {
+      return aValue.localeCompare(bValue);
+    } else {
+      return bValue.localeCompare(aValue);
     }
-    
-    return 0;
   });
 
-  // Calculate total pages for pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = sortedProducts.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
 
-  // Get current page items
-  const paginatedProducts = sortedProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
 
   const handleSort = (field: keyof Product) => {
-    if (field === sortField) {
+    if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
@@ -127,6 +132,27 @@ const ProductTable: React.FC<ProductTableProps> = ({
     if (mockStock <= 0) return "text-red-600 font-medium";
     if (mockStock <= product.minStock) return "text-amber-600 font-medium";
     return "";
+  };
+
+  // Mendapatkan data stok dan kalkulasinya
+  const getStockData = (product: Product) => {
+    const stock = mockStocks.find(s => s.productId === product.id);
+    const consumptionStats = mockProductConsumptionStats.find(s => s.productId === product.id);
+    
+    if (!stock) {
+      return {
+        status: { 
+          label: 'Tidak Ada Data', 
+          color: 'text-gray-500',
+          bgColor: 'bg-gray-100'
+        },
+        bufferStock: 0,
+        suggestedOrder: 0,
+        currentStock: 0
+      };
+    }
+    
+    return calculateAllStockMetrics(product, stock, consumptionStats);
   };
 
   return (
@@ -198,166 +224,190 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   Stok Min {getSortIcon("minStock")}
                 </div>
               </TableHead>
+              <TableHead>Status Stok</TableHead>
+              <TableHead>Buffer Stok</TableHead>
+              <TableHead>Saran Beli</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedProducts.length > 0 ? (
-              paginatedProducts.map((product) => (
-                <TableRow key={product.id} className="hover:bg-orange-50/30">
-                  <TableCell>
-                    <div className="relative w-12 h-12 rounded-md overflow-hidden border border-orange-100 bg-gradient-to-r from-orange-50 to-amber-50">
+            {currentItems.length > 0 ? (
+              currentItems.map((product) => {
+                const stockData = getStockData(product);
+                return (
+                  <TableRow key={product.id} className="hover:bg-orange-50/30">
+                    <TableCell className="align-middle">
                       {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                        />
+                        <div className="relative w-12 h-12 rounded-md overflow-hidden">
+                          <Image 
+                            src={product.imageUrl} 
+                            alt={product.name} 
+                            layout="fill" 
+                            objectFit="cover"
+                          />
+                        </div>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-orange-300">
-                          <FaBarcode size={16} />
+                        <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center">
+                          <FaBoxOpen size={24} className="text-gray-400" />
                         </div>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {product.name}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {product.brand || "Tidak diketahui"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{product.sku || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                      {getCategoryName(product.categoryId)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{product.unit}</TableCell>
-                  <TableCell>{product.sellingPrice ? formatRupiah(product.sellingPrice) : "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <span className={`mr-2 ${getStockStatusColor(product)}`}>
-                        {product.minStock || 0}
-                      </span>
-                      {getStockStatusColor(product) && (
-                        <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{product.name}</div>
+                      <div className="text-xs text-gray-500">{getCategoryName(product.categoryId)}</div>
+                    </TableCell>
+                    <TableCell>
+                      {product.sku ? (
+                        <div className="flex items-center">
+                          <FaBarcode size={12} className="mr-1 text-gray-400" />
+                          <span>{product.sku}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onViewDetail(product)}
-                        className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                      >
-                        <FaEye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEdit(product)}
-                        className="h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
-                      >
-                        <FaEdit className="h-4 w-4" />
-                      </Button>
-                      {onCreatePurchaseOrder && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onCreatePurchaseOrder(product)}
-                          className="h-8 w-8 text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-                          title="Buat pesanan pembelian"
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                        {getCategoryName(product.categoryId)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{product.unit}</TableCell>
+                    <TableCell>
+                      {product.sellingPrice ? (
+                        <div className="font-medium">{formatRupiah(product.sellingPrice)}</div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className={getStockStatusColor(product)}>
+                      {product.minStock || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge 
+                              variant="outline" 
+                              className={`${stockData.status.bgColor} ${stockData.status.color} hover:${stockData.status.bgColor}`}
+                            >
+                              {stockData.status.status === 'danger' && <FaExclamationTriangle className="mr-1" size={10} />}
+                              {stockData.status.status === 'warning' && <FaBell className="mr-1" size={10} />}
+                              {stockData.status.status === 'success' && <FaCheckCircle className="mr-1" size={10} />}
+                              {stockData.status.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Stok saat ini: {stockData.currentStock} {product.unit}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">
+                        {stockData.bufferStock} {product.unit}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {stockData.suggestedOrder > 0 ? (
+                        <div className="font-medium text-blue-600">
+                          {stockData.suggestedOrder} {product.unit}
+                        </div>
+                      ) : (
+                        <span className="text-green-600 font-medium">Cukup</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => onViewDetail(product)} 
+                          className="h-8 w-8 text-gray-600 hover:text-orange-600 hover:bg-orange-50"
                         >
-                          <FaShoppingCart className="h-4 w-4" />
+                          <FaEye size={14} />
                         </Button>
-                      )}
-                      {onAddToDefectList && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onAddToDefectList(product)}
-                          className="h-8 w-8 text-red-600 hover:text-red-800 hover:bg-red-50"
-                          title="Tambah ke daftar cacat"
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => onEdit(product)} 
+                          className="h-8 w-8 text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                         >
-                          <FaTrash className="h-4 w-4" />
+                          <FaEdit size={14} />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDelete(product.id)}
-                        className="h-8 w-8 text-red-600 hover:text-red-800 hover:bg-red-50"
-                      >
-                        <FaTrash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {onCreatePurchaseOrder && stockData.suggestedOrder > 0 && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => onCreatePurchaseOrder(product)} 
+                            className="h-8 w-8 text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                          >
+                            <FaShoppingCart size={14} />
+                          </Button>
+                        )}
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => onDelete(product.id)} 
+                          className="h-8 w-8 text-gray-600 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <FaTrash size={14} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                  {searchQuery
-                    ? "Tidak ada produk yang sesuai dengan pencarian Anda"
-                    : "Belum ada data produk tersedia"}
+                <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                  <div className="flex flex-col items-center">
+                    <FaSearch size={36} className="text-gray-300 mb-2" />
+                    <p>Tidak ada produk yang ditemukan</p>
+                    <p className="text-sm text-gray-400">Coba cari dengan kata kunci lain</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-
+      
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-orange-100 pt-4">
-          <div className="text-sm text-gray-500">
-            Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} dari {filteredProducts.length} produk
-          </div>
-          <div className="flex space-x-1">
+        <div className="flex justify-center mt-4">
+          <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+              className="text-gray-600"
             >
               Sebelumnya
             </Button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              // Show 5 pages max with the current page in the middle if possible
-              let pageToShow = i + 1;
-              if (totalPages > 5) {
-                if (currentPage > 3) {
-                  pageToShow = currentPage - 3 + i + 1;
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePageChange(page)}
+                className={
+                  currentPage === page
+                    ? "bg-gradient-to-r from-orange-500 to-amber-500"
+                    : "text-gray-600"
                 }
-                if (pageToShow > totalPages) {
-                  pageToShow = totalPages - 5 + i + 1;
-                }
-              }
-              
-              return (
-                <Button
-                  key={i}
-                  variant={currentPage === pageToShow ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(pageToShow)}
-                  className={currentPage === pageToShow 
-                    ? "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600" 
-                    : "border-orange-200 text-orange-700 hover:bg-orange-50"}
-                >
-                  {pageToShow}
-                </Button>
-              );
-            })}
+              >
+                {page}
+              </Button>
+            ))}
+            
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="border-orange-200 text-orange-700 hover:bg-orange-50"
+              className="text-gray-600"
             >
               Selanjutnya
             </Button>

@@ -5,9 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FaEdit, FaArrowLeft, FaBox, FaHistory, FaBarcode, FaTrash, FaPrint, FaSave } from "react-icons/fa";
+import { FaEdit, FaArrowLeft, FaBox, FaHistory, FaBarcode, FaTrash, FaPrint, FaSave, FaPills } from "react-icons/fa";
 import { formatRupiah } from "@/lib/utils";
 import { inventoryAPI, Product, StockMovement } from "../services/inventory-api";
+import { 
+  DrugClassification, 
+  getDrugClassInfo, 
+  getDrugClassBadgeStyles 
+} from "../utils/drug-classifications";
 
 interface ProductDetailsProps {
   productId: string;
@@ -119,6 +124,11 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                 <Badge variant="outline" className="border-white text-white uppercase">
                   {product.category}
                 </Badge>
+                {product.drugClassification && (
+                  <div className="ml-2 flex items-center">
+                    <DrugClassificationSymbol classification={product.drugClassification} />
+                  </div>
+                )}
               </div>
               <p className="mt-1 opacity-90">Kode: {product.code}</p>
             </div>
@@ -185,6 +195,30 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
               </div>
               <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-100 to-amber-100 flex items-center justify-center">
                 <span className="text-orange-500 font-bold">Rp</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-100 overflow-hidden">
+          <div className="h-2 bg-gradient-to-r from-orange-500 to-amber-500"></div>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-800">Klasifikasi Obat</p>
+                {product.drugClassification ? (
+                  <div className="flex items-center mt-1">
+                    <DrugClassificationSymbol classification={product.drugClassification} size="lg" />
+                    <h3 className="ml-2 text-xl font-bold text-orange-900">
+                      {getDrugClassInfo(product.drugClassification)?.name || '-'}
+                    </h3>
+                  </div>
+                ) : (
+                  <h3 className="text-xl font-bold text-orange-900">Belum Diklasifikasi</h3>
+                )}
+              </div>
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-100 to-amber-100 flex items-center justify-center">
+                <FaPills className="h-6 w-6 text-orange-500" />
               </div>
             </div>
           </CardContent>
@@ -267,6 +301,25 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-gray-500">Supplier</p>
                   <p>{product.supplier || "-"}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-gray-500">Klasifikasi Obat</p>
+                  {product.drugClassification ? (
+                    <div className="flex items-center">
+                      <DrugClassificationSymbol classification={product.drugClassification} />
+                      <span className="ml-2">
+                        {getDrugClassInfo(product.drugClassification)?.name || product.drugClassification}
+                      </span>
+                      {product.requiresPrescription && (
+                        <Badge className="ml-2 bg-red-100 text-red-700 border border-red-300">
+                          Wajib Resep
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <p>-</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -428,3 +481,69 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     </div>
   );
 }
+
+// Komponen untuk menampilkan simbol klasifikasi obat
+const DrugClassificationSymbol = ({ 
+  classification, 
+  size = "md" 
+}: { 
+  classification: string, 
+  size?: "sm" | "md" | "lg" 
+}) => {
+  const sizeClass = {
+    sm: "w-6 h-6",
+    md: "w-8 h-8",
+    lg: "w-12 h-12"
+  };
+
+  const getSymbolContent = () => {
+    switch (classification) {
+      case DrugClassification.FREE:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-green-500 flex items-center justify-center`} 
+               title="Obat Bebas">
+          </div>
+        );
+      case DrugClassification.LIMITED_FREE:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-blue-600 flex items-center justify-center`} 
+               title="Obat Bebas Terbatas">
+          </div>
+        );
+      case DrugClassification.PRESCRIPTION:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-black bg-red-500 flex items-center justify-center`} 
+               title="Obat Keras">
+            <span className="text-white font-bold" style={{ fontSize: size === "lg" ? "18px" : size === "md" ? "14px" : "10px" }}>K</span>
+          </div>
+        );
+      case DrugClassification.PSYCHOTROPIC:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-red-600 bg-white flex items-center justify-center`} 
+               title="Obat Psikotropika">
+            <span className="text-red-600 font-bold" style={{ fontSize: size === "lg" ? "24px" : size === "md" ? "18px" : "14px" }}>+</span>
+          </div>
+        );
+      case DrugClassification.NARCOTICS:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-red-600 bg-white flex items-center justify-center`} 
+               title="Obat Narkotika">
+            <span className="text-red-600 font-bold" style={{ fontSize: size === "lg" ? "24px" : size === "md" ? "18px" : "14px" }}>+</span>
+          </div>
+        );
+      default:
+        return (
+          <div className={`${sizeClass[size]} rounded-full border-2 border-gray-300 bg-gray-100 flex items-center justify-center`} 
+               title="Belum Diklasifikasi">
+            <span className="text-gray-400">?</span>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="flex-shrink-0 inline-flex">
+      {getSymbolContent()}
+    </div>
+  );
+};

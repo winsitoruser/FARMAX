@@ -12,9 +12,11 @@ import {
   TableCell, 
   TableHead, 
   TableHeader, 
-  TableRow 
+  TableRow,
+  TableFooter
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { mockCategories, mockProducts, mockStocks } from "@/modules/inventory/types";
 import { formatRupiah } from "@/lib/utils";
 import { 
@@ -30,8 +32,27 @@ import {
   FaArrowDown,
   FaCalendarAlt,
   FaWarehouse,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaInfoCircle,
+  FaSearch,
+  FaMapMarkerAlt,
+  FaCubes
 } from "react-icons/fa";
+import StockMovementHistoryModal from "@/modules/inventory/components/StockMovementHistoryModal";
+import StockValueSummaryCard from "@/modules/inventory/components/StockValueSummaryCard";
+import { 
+  generateStockValueData, 
+  generateProductStockValueData,
+  getProductGroupValueData,
+  getLocationStockValueData 
+} from "@/modules/inventory/utils/stockReportUtils";
+
+import {
+  exportStockValueSummaryToPDF,
+  exportStockValueSummaryToExcel,
+  exportProductsToExcel,
+  printStockValueSummary
+} from "@/modules/inventory/utils/exportUtils";
 
 // Helper function to format date
 const formatDate = (date: Date) => {
@@ -42,38 +63,7 @@ const formatDate = (date: Date) => {
   });
 };
 
-// Mock stock data for value report
-const generateStockValueData = () => {
-  const totalStockValue = mockProducts.reduce((total, product) => {
-    const stock = mockStocks.find(s => s.productId === product.id);
-    return total + (stock?.currentStock || 0) * product.purchasePrice;
-  }, 0);
-  
-  // Group by category
-  const categoryValues = mockCategories.map(category => {
-    const productsInCategory = mockProducts.filter(p => p.categoryId === category.id);
-    const value = productsInCategory.reduce((total, product) => {
-      const stock = mockStocks.find(s => s.productId === product.id);
-      return total + (stock?.currentStock || 0) * product.purchasePrice;
-    }, 0);
-    
-    const percentage = (value / totalStockValue) * 100;
-    
-    return {
-      id: category.id,
-      name: category.name,
-      value,
-      percentage
-    };
-  });
-  
-  return {
-    totalStockValue,
-    categoryValues
-  };
-};
-
-// Mock movement data
+// Generate movement data (tetap mempertahankan fungsi yang ada)
 const generateMovementData = () => {
   const today = new Date();
   
@@ -131,7 +121,7 @@ const generateMovementData = () => {
   ];
 };
 
-// Mock low stock data
+// Generate low stock data (tetap mempertahankan fungsi yang ada)
 const generateLowStockData = () => {
   return mockProducts.map(product => {
     const stock = mockStocks.find(s => s.productId === product.id);
@@ -154,10 +144,64 @@ const ReportsPage: NextPage = () => {
   const [tab, setTab] = useState("stock-value");
   const [period, setPeriod] = useState("all-time");
   const [exportFormat, setExportFormat] = useState("pdf");
+  const [valueView, setValueView] = useState<'category' | 'product' | 'group' | 'location'>('category');
   
-  const stockValueData = generateStockValueData();
+  // State for Stock Movement History Modal
+  const [showMovementHistory, setShowMovementHistory] = useState(false);
+  
+  // Get data from utilities
+  const { totalStockValue, previousTotalValue, categoryValues } = generateStockValueData();
+  const productValues = generateProductStockValueData();
+  const { totalValue: groupTotalValue, groupValues } = getProductGroupValueData();
+  const locationValues = getLocationStockValueData();
+  
+  // Legacy data for compatibility
   const movementData = generateMovementData();
   const lowStockData = generateLowStockData();
+  
+  // Handle data export
+  const handleExportData = () => {
+    if (!categoryValues.length) {
+      alert('Tidak ada data untuk diekspor');
+      return;
+    }
+
+    switch (exportFormat) {
+      case 'pdf':
+        exportStockValueSummaryToPDF(
+          categoryValues, 
+          locationValues, 
+          `laporan-nilai-stok-${new Date().toISOString().split('T')[0]}.pdf`
+        );
+        break;
+      case 'excel':
+        exportStockValueSummaryToExcel(
+          categoryValues, 
+          locationValues, 
+          `laporan-nilai-stok-${new Date().toISOString().split('T')[0]}.xlsx`
+        );
+        break;
+      case 'csv':
+        exportStockValueSummaryToExcel(
+          categoryValues, 
+          locationValues, 
+          `laporan-nilai-stok-${new Date().toISOString().split('T')[0]}.csv`
+        );
+        break;
+      default:
+        alert('Format export tidak didukung');
+    }
+  };
+  
+  // Handle print report
+  const handlePrintReport = () => {
+    if (!categoryValues.length) {
+      alert('Tidak ada data untuk dicetak');
+      return;
+    }
+    
+    printStockValueSummary(categoryValues, locationValues);
+  };
   
   return (
     <InventoryLayout>
@@ -176,7 +220,7 @@ const ReportsPage: NextPage = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-                <FaChartBar className="mr-3 text-indigo-500" /> Laporan Inventori
+                <FaChartBar className="mr-3 text-orange-500" /> Laporan Inventori
               </h1>
               <p className="text-gray-600 mt-1">
                 Analisis dan laporan mengenai stok, nilai, dan pergerakan inventori
@@ -194,261 +238,385 @@ const ReportsPage: NextPage = () => {
                 </SelectContent>
               </Select>
               
-              <Button className="bg-indigo-600 hover:bg-indigo-700">
+              <Button 
+                className="bg-orange-600 hover:bg-orange-700"
+                onClick={handleExportData}
+              >
                 <FaFileExport className="mr-2 h-4 w-4" /> Export
               </Button>
             </div>
           </div>
           
-          {/* Filter Card */}
-          <Card className="border-indigo-200">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Periode</p>
-                  <Select value={period} onValueChange={setPeriod}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih periode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="today">Hari Ini</SelectItem>
-                      <SelectItem value="yesterday">Kemarin</SelectItem>
-                      <SelectItem value="this-week">Minggu Ini</SelectItem>
-                      <SelectItem value="this-month">Bulan Ini</SelectItem>
-                      <SelectItem value="last-month">Bulan Lalu</SelectItem>
-                      <SelectItem value="this-year">Tahun Ini</SelectItem>
-                      <SelectItem value="all-time">Semua Waktu</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Kategori</p>
-                  <Select defaultValue="all">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Kategori</SelectItem>
-                      {mockCategories.map(category => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Lokasi</p>
-                  <Select defaultValue="all">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih lokasi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Lokasi</SelectItem>
-                      <SelectItem value="display">Rak Display</SelectItem>
-                      <SelectItem value="warehouse">Gudang Utama</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-end">
-                  <Button variant="outline" className="w-full">
-                    <FaChartBar className="mr-2 h-4 w-4" /> Terapkan Filter
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Report Tabs */}
-          <Tabs defaultValue="stock-value" value={tab} onValueChange={setTab} className="space-y-6">
-            <TabsList className="grid grid-cols-1 md:grid-cols-4 h-auto p-0 bg-transparent gap-2">
-              <TabsTrigger
-                value="stock-value"
-                className={`data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900 data-[state=active]:border-indigo-200 border rounded-lg py-3 px-4 flex items-center justify-center gap-2 ${
-                  tab === "stock-value" ? "" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <FaChartPie className="h-4 w-4" />
+          {/* Tabs */}
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsTrigger value="stock-value" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                <FaChartPie className="h-4 w-4 mr-2" />
                 <span>Nilai Stok</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="stock-movement"
-                className={`data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900 data-[state=active]:border-indigo-200 border rounded-lg py-3 px-4 flex items-center justify-center gap-2 ${
-                  tab === "stock-movement" ? "" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <FaChartLine className="h-4 w-4" />
+              <TabsTrigger value="stock-movement" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                <FaChartLine className="h-4 w-4 mr-2" />
                 <span>Pergerakan Stok</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="low-stock"
-                className={`data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900 data-[state=active]:border-indigo-200 border rounded-lg py-3 px-4 flex items-center justify-center gap-2 ${
-                  tab === "low-stock" ? "" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <FaExclamationTriangle className="h-4 w-4" />
+              <TabsTrigger value="low-stock" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                <FaArrowDown className="h-4 w-4 mr-2" />
                 <span>Stok Minimum</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="product-analysis"
-                className={`data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900 data-[state=active]:border-indigo-200 border rounded-lg py-3 px-4 flex items-center justify-center gap-2 ${
-                  tab === "product-analysis" ? "" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <FaBoxOpen className="h-4 w-4" />
+              <TabsTrigger value="product-analysis" className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700">
+                <FaBoxOpen className="h-4 w-4 mr-2" />
                 <span>Analisis Produk</span>
               </TabsTrigger>
             </TabsList>
             
             {/* Stock Value Tab Content */}
             <TabsContent value="stock-value" className="space-y-6 mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-indigo-200 md:col-span-2">
-                  <CardHeader className="border-b">
-                    <CardTitle>Ringkasan Nilai Stok</CardTitle>
-                    <CardDescription>
-                      Total nilai persediaan berdasarkan kategori
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between">
+              {/* Stock Value View Options */}
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button 
+                  variant={valueView === 'category' ? 'default' : 'outline'}
+                  className={valueView === 'category' ? 'bg-orange-600 hover:bg-orange-700' : 'border-orange-200 text-orange-700 hover:bg-orange-50'}
+                  onClick={() => setValueView('category')}
+                  size="sm"
+                >
+                  <FaBoxOpen className="mr-2 h-3 w-3" /> Kategori
+                </Button>
+                <Button 
+                  variant={valueView === 'product' ? 'default' : 'outline'}
+                  className={valueView === 'product' ? 'bg-orange-600 hover:bg-orange-700' : 'border-orange-200 text-orange-700 hover:bg-orange-50'}
+                  onClick={() => setValueView('product')}
+                  size="sm"
+                >
+                  <FaCubes className="mr-2 h-3 w-3" /> Produk
+                </Button>
+                <Button 
+                  variant={valueView === 'group' ? 'default' : 'outline'}
+                  className={valueView === 'group' ? 'bg-orange-600 hover:bg-orange-700' : 'border-orange-200 text-orange-700 hover:bg-orange-50'}
+                  onClick={() => setValueView('group')}
+                  size="sm"
+                >
+                  <FaChartPie className="mr-2 h-3 w-3" /> Kelompok
+                </Button>
+                <Button 
+                  variant={valueView === 'location' ? 'default' : 'outline'}
+                  className={valueView === 'location' ? 'bg-orange-600 hover:bg-orange-700' : 'border-orange-200 text-orange-700 hover:bg-orange-50'}
+                  onClick={() => setValueView('location')}
+                  size="sm"
+                >
+                  <FaMapMarkerAlt className="mr-2 h-3 w-3" /> Lokasi
+                </Button>
+              </div>
+              
+              {/* Category View */}
+              {valueView === 'category' && (
+                <div className="grid grid-cols-1 gap-6">
+                  <StockValueSummaryCard
+                    totalValue={totalStockValue}
+                    previousTotalValue={previousTotalValue}
+                    categoryValues={categoryValues}
+                    onPrint={handlePrintReport}
+                    onExport={handleExportData}
+                  />
+                  
+                  <Card className="border-orange-200 mt-6">
+                    <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-amber-50">
+                      <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-sm text-gray-500">Total Nilai Stok</p>
-                          <p className="text-3xl font-bold text-gray-900">
-                            {formatRupiah(stockValueData.totalStockValue)}
-                          </p>
+                          <CardTitle>Produk dengan Nilai Stok Tertinggi</CardTitle>
+                          <CardDescription>
+                            Produk-produk yang memberi kontribusi terbesar terhadap total nilai stok
+                          </CardDescription>
                         </div>
-                        <Button variant="outline" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50">
-                          <FaPrint className="mr-2 h-4 w-4" /> Cetak
-                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-orange-50">
+                              <TableHead>Produk</TableHead>
+                              <TableHead>Kategori</TableHead>
+                              <TableHead className="text-center">Stok</TableHead>
+                              <TableHead className="text-right">Harga Beli</TableHead>
+                              <TableHead className="text-right">Nilai Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {productValues.slice(0, 10).map((product) => (
+                              <TableRow key={product.id} className="hover:bg-orange-50">
+                                <TableCell>
+                                  <div className="font-medium">{product.name}</div>
+                                  <div className="text-sm text-gray-500">{product.sku}</div>
+                                </TableCell>
+                                <TableCell>{product.categoryName}</TableCell>
+                                <TableCell className="text-center">{product.currentStock}</TableCell>
+                                <TableCell className="text-right">{formatRupiah(product.price)}</TableCell>
+                                <TableCell className="text-right font-medium">{formatRupiah(product.value)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                          <TableFooter className="bg-orange-50">
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-right font-bold">
+                                Total Nilai ({productValues.length} produk)
+                              </TableCell>
+                              <TableCell className="text-right font-bold">
+                                {formatRupiah(totalStockValue)}
+                              </TableCell>
+                            </TableRow>
+                          </TableFooter>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              
+              {/* Product View */}
+              {valueView === 'product' && (
+                <div className="space-y-6">
+                  <Card className="border-orange-200 shadow-md">
+                    <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-amber-50">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle>Nilai Stok per Produk</CardTitle>
+                          <CardDescription>
+                            Detail nilai stok untuk setiap produk dalam inventori
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <Input placeholder="Cari produk..." className="pl-9 w-[250px]" />
+                            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                            onClick={() => exportProductsToExcel(
+                              productValues.map(p => ({
+                                id: p.id,
+                                code: p.sku,
+                                name: p.name,
+                                category: p.categoryName,
+                                stockQty: p.currentStock,
+                                buyPrice: p.price,
+                                stockValue: p.value,
+                                unit: p.unit || 'Pcs'
+                              })), 
+                              `produk-nilai-stok-${new Date().toISOString().split('T')[0]}.xlsx`
+                            )}
+                          >
+                            <FaFileExcel className="mr-2 h-4 w-4" /> Ekspor Excel
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            className="border-orange-200 text-orange-600 hover:bg-orange-50"
+                            onClick={() => window.print()}
+                          >
+                            <FaPrint className="mr-2 h-4 w-4" /> Cetak
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="border-t">
+                        <div className="p-4 bg-orange-50 flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Badge className="bg-orange-100 text-orange-800 mr-2">Total: {productValues.length} produk</Badge>
+                            <span className="text-sm text-gray-600">
+                              Nilai Total: <span className="font-bold">{formatRupiah(totalStockValue)}</span>
+                            </span>
+                          </div>
+                          <Select defaultValue="value-desc">
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="Urutkan berdasarkan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="value-desc">Nilai (Tertinggi)</SelectItem>
+                              <SelectItem value="value-asc">Nilai (Terendah)</SelectItem>
+                              <SelectItem value="name-asc">Nama (A-Z)</SelectItem>
+                              <SelectItem value="name-desc">Nama (Z-A)</SelectItem>
+                              <SelectItem value="stock-desc">Stok (Tertinggi)</SelectItem>
+                              <SelectItem value="stock-asc">Stok (Terendah)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       
+                      <div className="max-h-[600px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 z-10">
+                            <TableRow className="bg-white">
+                              <TableHead>Produk</TableHead>
+                              <TableHead>Kategori</TableHead>
+                              <TableHead className="text-center">Stok</TableHead>
+                              <TableHead className="text-right">Harga Beli</TableHead>
+                              <TableHead className="text-right">Nilai Total</TableHead>
+                              <TableHead className="text-center">Kadaluarsa</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {productValues.slice(0, 30).map((product) => (
+                              <TableRow key={product.id} className="hover:bg-orange-50">
+                                <TableCell>
+                                  <div className="font-medium">{product.name}</div>
+                                  <div className="text-sm text-gray-500">{product.sku}</div>
+                                </TableCell>
+                                <TableCell>{product.categoryName}</TableCell>
+                                <TableCell className="text-center">{product.currentStock}</TableCell>
+                                <TableCell className="text-right">{formatRupiah(product.price)}</TableCell>
+                                <TableCell className="text-right font-medium">{formatRupiah(product.value)}</TableCell>
+                                <TableCell className="text-center">
+                                  {product.expiryDate ? formatDate(product.expiryDate) : '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      
+                      <div className="p-4 text-center border-t">
+                        <Button variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50">
+                          Lihat Semua Produk
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              
+              {/* Group View */}
+              {valueView === 'group' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="border-orange-200 md:col-span-2 shadow-md">
+                    <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-amber-50">
+                      <CardTitle>Nilai Stok Berdasarkan Kelompok Produk</CardTitle>
+                      <CardDescription>
+                        Distribusi nilai inventori berdasarkan kategori farmasi
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-500">Total Nilai Stok</p>
+                            <p className="text-3xl font-bold text-gray-900">
+                              {formatRupiah(groupTotalValue)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {groupValues.map((group) => (
+                            <div key={group.id} className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <div 
+                                    className="w-3 h-3 rounded-full mr-2" 
+                                    style={{ backgroundColor: group.color }}
+                                  ></div>
+                                  <p className="text-sm font-medium">{group.name}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium">{formatRupiah(group.value)}</p>
+                                  {group.trend !== 'stable' && (
+                                    <Badge className={group.trend === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                      {group.trend === 'up' ? <FaArrowUp className="mr-1 h-3 w-3" /> : <FaArrowDown className="mr-1 h-3 w-3" />}
+                                      {group.trendPercentage.toFixed(1)}%
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full rounded-full" 
+                                  style={{ 
+                                    width: `${group.percentage}%`,
+                                    backgroundColor: group.color 
+                                  }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-xs text-gray-500">
+                                <span>{group.itemCount} produk</span>
+                                <span>{group.percentage.toFixed(1)}% dari total</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="border-orange-200 shadow-md">
+                    <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-amber-50">
+                      <CardTitle>Detail Kelompok</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
                       <div className="space-y-4">
-                        {stockValueData.categoryValues.map((category, index) => (
-                          <div key={category.id} className="space-y-2">
-                            <div className="flex justify-between">
-                              <p className="text-sm font-medium">{category.name}</p>
-                              <p className="text-sm font-medium">{formatRupiah(category.value)}</p>
+                        {groupValues.map((group) => (
+                          <div key={group.id} className={`p-4 rounded-lg bg-opacity-10 border`} style={{ backgroundColor: `${group.color}20`, borderColor: `${group.color}40` }}>
+                            <div className="flex items-start">
+                              <div className="p-3 rounded-full mr-4" style={{ backgroundColor: `${group.color}30` }}>
+                                <div className="h-6 w-6" style={{ color: group.color }}>
+                                  <FaBoxOpen />
+                                </div>
+                              </div>
+                              <div>
+                                <p className="font-medium" style={{ color: group.color }}>{group.name}</p>
+                                <p className="text-2xl font-bold text-gray-900 mt-1">{formatRupiah(group.value)}</p>
+                                <p className="text-sm text-gray-500 mt-1">{group.itemCount} produk</p>
+                              </div>
                             </div>
-                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-gradient-to-r from-indigo-500 to-blue-500"
-                                style={{ width: `${category.percentage}%` }}
-                              />
-                            </div>
-                            <p className="text-xs text-gray-500 text-right">{category.percentage.toFixed(1)}% dari total</p>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="border-indigo-200">
-                  <CardHeader className="border-b">
-                    <CardTitle>Detail Inventori</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-start">
-                          <div className="bg-blue-200 p-3 rounded-full mr-4">
-                            <FaBoxOpen className="h-6 w-6 text-blue-700" />
-                          </div>
-                          <div>
-                            <p className="text-blue-800 text-sm font-medium">Total Produk</p>
-                            <p className="text-2xl font-bold text-blue-900 mt-1">{mockProducts.length}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-start">
-                          <div className="bg-green-200 p-3 rounded-full mr-4">
-                            <FaWarehouse className="h-6 w-6 text-green-700" />
-                          </div>
-                          <div>
-                            <p className="text-green-800 text-sm font-medium">Total Stok</p>
-                            <p className="text-2xl font-bold text-green-900 mt-1">
-                              {mockStocks.reduce((total, stock) => total + stock.currentStock, 0)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-start">
-                          <div className="bg-red-200 p-3 rounded-full mr-4">
-                            <FaExclamationTriangle className="h-6 w-6 text-red-700" />
-                          </div>
-                          <div>
-                            <p className="text-red-800 text-sm font-medium">Stok Minimum</p>
-                            <p className="text-2xl font-bold text-red-900 mt-1">
-                              {lowStockData.length}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
               
-              <Card className="border-indigo-200">
-                <CardHeader className="border-b">
-                  <CardTitle>Nilai Stok per Produk</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead>Produk</TableHead>
-                          <TableHead>Kategori</TableHead>
-                          <TableHead className="text-center">Stok</TableHead>
-                          <TableHead className="text-right">Harga Beli</TableHead>
-                          <TableHead className="text-right">Nilai Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mockProducts.slice(0, 5).map((product) => {
-                          const stock = mockStocks.find(s => s.productId === product.id);
-                          const category = mockCategories.find(c => c.id === product.categoryId);
-                          const value = (stock?.currentStock || 0) * product.purchasePrice;
-                          
-                          return (
-                            <TableRow key={product.id} className="hover:bg-gray-50">
-                              <TableCell>
-                                <div className="font-medium">{product.name}</div>
-                                <div className="text-sm text-gray-500">{product.sku}</div>
-                              </TableCell>
-                              <TableCell>{category?.name || "-"}</TableCell>
-                              <TableCell className="text-center">{stock?.currentStock || 0}</TableCell>
-                              <TableCell className="text-right">{formatRupiah(product.purchasePrice)}</TableCell>
-                              <TableCell className="text-right font-medium">{formatRupiah(value)}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="mt-4 text-center">
-                    <Button variant="link" className="text-indigo-600">
-                      Lihat Semua Produk
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Location View */}
+              {valueView === 'location' && (
+                <div className="grid grid-cols-1 gap-6">
+                  <Card className="border-orange-200 shadow-md">
+                    <CardHeader className="border-b bg-gradient-to-r from-orange-50 to-amber-50">
+                      <CardTitle>Nilai Stok Berdasarkan Lokasi</CardTitle>
+                      <CardDescription>
+                        Distribusi nilai inventori berdasarkan lokasi penyimpanan
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {locationValues.map((location) => (
+                          <div key={location.id} className="border border-orange-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                            <div className="p-4 bg-orange-50 border-b border-orange-200 flex items-center gap-3">
+                              <div className="bg-white p-2 rounded-full border border-orange-200">
+                                <FaMapMarkerAlt className="h-5 w-5 text-orange-500" />
+                              </div>
+                              <h3 className="font-medium text-gray-800">{location.name}</h3>
+                            </div>
+                            <div className="p-4">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-sm text-gray-500">Nilai Stok:</span>
+                                <span className="font-bold text-gray-900">{formatRupiah(location.value)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-500">Jumlah Produk:</span>
+                                <span className="font-medium text-gray-700">{location.itemCount}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </TabsContent>
             
             {/* Stock Movement Tab Content */}
             <TabsContent value="stock-movement" className="space-y-6 mt-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-indigo-200 md:col-span-3">
+                <Card className="border-orange-200 md:col-span-3">
                   <CardHeader className="border-b">
                     <div className="flex justify-between items-center">
                       <div>
@@ -517,7 +685,11 @@ const ReportsPage: NextPage = () => {
                     </div>
                     
                     <div className="mt-4 text-center">
-                      <Button variant="link" className="text-indigo-600">
+                      <Button 
+                        variant="link" 
+                        className="text-indigo-600"
+                        onClick={() => setShowMovementHistory(true)}
+                      >
                         Lihat Riwayat Lengkap
                       </Button>
                     </div>
@@ -528,7 +700,7 @@ const ReportsPage: NextPage = () => {
             
             {/* Low Stock Tab Content */}
             <TabsContent value="low-stock" className="space-y-6 mt-6">
-              <Card className="border-indigo-200">
+              <Card className="border-orange-200">
                 <CardHeader className="border-b">
                   <div className="flex justify-between items-center">
                     <div>
@@ -600,7 +772,7 @@ const ReportsPage: NextPage = () => {
             
             {/* Product Analysis Tab Content */}
             <TabsContent value="product-analysis" className="space-y-6 mt-6">
-              <Card className="border-indigo-200">
+              <Card className="border-orange-200">
                 <CardHeader className="border-b">
                   <CardTitle>Analisis Produk</CardTitle>
                   <CardDescription>
@@ -621,6 +793,13 @@ const ReportsPage: NextPage = () => {
           </Tabs>
         </div>
       </div>
+      
+      {/* Stock Movement History Modal */}
+      <StockMovementHistoryModal
+        open={showMovementHistory}
+        onClose={() => setShowMovementHistory(false)}
+        movements={movementData}
+      />
     </InventoryLayout>
   );
 };

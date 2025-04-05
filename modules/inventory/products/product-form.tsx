@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { FaSave, FaBarcode, FaTimes, FaImage, FaArrowLeft } from "react-icons/fa";
 import { inventoryAPI, Product } from "../services/inventory-api";
 import { toast } from "@/components/ui/use-toast";
+import { DrugClassification, getDrugClassInfo } from "../utils/drug-classifications";
 
 // Define the form schema
 const formSchema = z.object({
@@ -51,6 +52,9 @@ const formSchema = z.object({
   isActive: z.boolean().default(true),
   location: z.string().optional(),
   batchNumber: z.string().optional(),
+  drugClassification: z.string().optional(),
+  requiresPrescription: z.boolean().default(false),
+  storageRequirements: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -92,6 +96,9 @@ export default function ProductForm({ productId, isEditMode = false }: ProductFo
       isActive: true,
       location: "",
       batchNumber: "",
+      drugClassification: "",
+      requiresPrescription: false,
+      storageRequirements: "",
       notes: "",
     },
   });
@@ -131,6 +138,9 @@ export default function ProductForm({ productId, isEditMode = false }: ProductFo
             isActive: product.isActive,
             location: product.location || "",
             batchNumber: product.batchNumber || "",
+            drugClassification: product.drugClassification || "",
+            requiresPrescription: product.requiresPrescription || false,
+            storageRequirements: product.storageRequirements || "",
             notes: product.notes || "",
           });
           
@@ -304,20 +314,35 @@ export default function ProductForm({ productId, isEditMode = false }: ProductFo
       ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="basic" className="w-full">
+            <Tabs defaultValue="basic-info" className="w-full">
               <TabsList className="mb-6 bg-orange-50 text-orange-900">
-                <TabsTrigger value="basic" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                <TabsTrigger
+                  value="basic-info"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
                   Informasi Dasar
                 </TabsTrigger>
-                <TabsTrigger value="inventory" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                  Informasi Stok
+                <TabsTrigger
+                  value="pricing"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
+                  Harga & Inventori
                 </TabsTrigger>
-                <TabsTrigger value="additional" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                <TabsTrigger
+                  value="additional"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
                   Informasi Tambahan
+                </TabsTrigger>
+                <TabsTrigger
+                  value="drug-classification"
+                  className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
+                  Klasifikasi Obat
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="basic" className="space-y-6">
+              <TabsContent value="basic-info" className="space-y-6">
                 <Card className="border-orange-100">
                   <CardHeader>
                     <CardTitle>Informasi Produk Dasar</CardTitle>
@@ -659,7 +684,7 @@ export default function ProductForm({ productId, isEditMode = false }: ProductFo
                 </Card>
               </TabsContent>
 
-              <TabsContent value="inventory" className="space-y-6">
+              <TabsContent value="pricing" className="space-y-6">
                 <Card className="border-orange-100">
                   <CardHeader>
                     <CardTitle>Informasi Stok</CardTitle>
@@ -805,6 +830,99 @@ export default function ProductForm({ productId, isEditMode = false }: ProductFo
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="drug-classification" className="space-y-6">
+                <Card className="border-orange-100">
+                  <CardHeader>
+                    <CardTitle>Klasifikasi Obat</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="drugClassification"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Klasifikasi Obat</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih klasifikasi obat" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">Tidak Diklasifikasi</SelectItem>
+                                <SelectItem value={DrugClassification.FREE}>
+                                  Obat Bebas (Hijau)
+                                </SelectItem>
+                                <SelectItem value={DrugClassification.LIMITED_FREE}>
+                                  Obat Bebas Terbatas (Biru)
+                                </SelectItem>
+                                <SelectItem value={DrugClassification.PRESCRIPTION}>
+                                  Obat Keras (Merah, K)
+                                </SelectItem>
+                                <SelectItem value={DrugClassification.PSYCHOTROPIC}>
+                                  Obat Psikotropika (Tanda +)
+                                </SelectItem>
+                                <SelectItem value={DrugClassification.NARCOTICS}>
+                                  Obat Narkotika (Tanda +)
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="requiresPrescription"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between space-x-3 rounded-md border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Wajib Resep Dokter
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Wajib melampirkan resep saat transaksi
+                              </p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name="storageRequirements"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Persyaratan Penyimpanan</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Contoh: Simpan pada suhu kamar, hindari sinar matahari langsung"
+                                  className="resize-none h-20"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

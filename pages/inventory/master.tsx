@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import InventoryLayout from '@/components/layouts/inventory-layout';
-import { FaPlus, FaPencilAlt, FaTrash, FaTag, FaBox, FaRuler, FaWarehouse, FaSave, FaBuilding, FaTruck, FaMoneyBillWave } from 'react-icons/fa';
+import { FaPlus, FaPencilAlt, FaTrash, FaTag, FaBox, FaRuler, FaWarehouse, FaSave, FaBuilding, FaTruck, FaMoneyBillWave, FaPills } from 'react-icons/fa';
 import { 
   mockCategories, mockPackagings, mockUnitSizes, mockLocations, 
   Category, Packaging, UnitSize, Location 
@@ -25,27 +25,7 @@ import {
 import useSupplier from '@/hooks/use-supplier';
 import { Supplier } from '@/types/supplier';
 import { toastAlert } from '@/components/common/alerts';
-
-type FormData = {
-  id: string;
-  name: string;
-  description: string;
-  code: string;
-  status: 'active' | 'inactive';
-};
-
-type SupplierFormData = {
-  id: string;
-  company_name: string;
-  street: string;
-  district: string;
-  city: string;
-  province: string;
-  postal_code: string;
-  company_phone: string;
-  email: string;
-  accepted_status: string;
-};
+import { DrugClassification, getDrugClassInfo, getAllDrugClassifications } from '@/modules/inventory/utils/drug-classifications';
 
 // Type definition for Price Group
 type PriceGroup = {
@@ -68,13 +48,88 @@ type PriceGroupFormData = {
   status: 'active' | 'inactive';
 };
 
+type FormData = {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  status: 'active' | 'inactive';
+};
+
+type SupplierFormData = {
+  id: string;
+  company_name: string;
+  street: string;
+  district: string;
+  city: string;
+  province: string;
+  postal_code: string;
+  company_phone: string;
+  email: string;
+  accepted_status: string;
+};
+
+// DrugClassItem interface for the drug classifications table
+type DrugClassItem = {
+  id: string;
+  name: string;
+  symbol: string;
+  saleRequirements: string;
+  description: string;
+  status: 'active' | 'inactive';
+};
+
 export default function InventoryMaster() {
   // State untuk menyimpan data
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
-  const [packagings, setPackagings] = useState<Packaging[]>(mockPackagings);
-  const [unitSizes, setUnitSizes] = useState<UnitSize[]>(mockUnitSizes);
-  const [locations, setLocations] = useState<Location[]>(mockLocations);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [packagings, setPackagings] = useState<Packaging[]>([]);
+  const [unitSizes, setUnitSizes] = useState<UnitSize[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [priceGroups, setPriceGroups] = useState<PriceGroup[]>([]); // New state for price groups
+  
+  // State untuk drug classifications
+  const [drugClasses, setDrugClasses] = useState<DrugClassItem[]>([
+    {
+      id: DrugClassification.FREE,
+      name: 'Obat Bebas',
+      symbol: '⚪',
+      saleRequirements: 'Bisa dibeli bebas tanpa resep dokter',
+      description: 'Obat yang dapat dibeli bebas tanpa resep dokter',
+      status: 'active'
+    },
+    {
+      id: DrugClassification.LIMITED_FREE,
+      name: 'Obat Bebas Terbatas',
+      symbol: '🔵',
+      saleRequirements: 'Bisa dibeli tanpa resep, tapi harus dengan informasi/penjelasan dari apoteker',
+      description: 'Obat yang dapat dibeli tanpa resep, tapi harus dengan informasi dari apoteker',
+      status: 'active'
+    },
+    {
+      id: DrugClassification.PRESCRIPTION,
+      name: 'Obat Keras',
+      symbol: '🔴K',
+      saleRequirements: 'Wajib dengan resep dokter',
+      description: 'Obat yang hanya dapat dibeli dengan resep dokter',
+      status: 'active'
+    },
+    {
+      id: DrugClassification.PSYCHOTROPIC,
+      name: 'Obat Psikotropika',
+      symbol: '🔴K⚠️',
+      saleRequirements: 'Resep dokter + pencatatan khusus (harus diawasi ketat)',
+      description: 'Obat keras dengan efek pada sistem saraf pusat, memerlukan pengawasan ketat',
+      status: 'active'
+    },
+    {
+      id: DrugClassification.NARCOTICS,
+      name: 'Obat Narkotika',
+      symbol: '❌',
+      saleRequirements: 'Resep dokter + pelaporan dan pencatatan yang sangat ketat (hanya untuk RS/apotek tertentu)',
+      description: 'Obat dengan pengawasan sangat ketat karena risiko penyalahgunaan tinggi',
+      status: 'active'
+    },
+  ]);
   
   // State untuk dialog dan form
   const [activeTab, setActiveTab] = useState('categories');
@@ -100,6 +155,15 @@ export default function InventoryMaster() {
     min_qty: 0,
     status: 'active'
   }); // New state for price group form data
+  
+  const [drugClassFormData, setDrugClassFormData] = useState<DrugClassItem>({
+    id: '',
+    name: '',
+    symbol: '',
+    saleRequirements: '',
+    description: '',
+    status: 'active'
+  }); // New state for drug class form data
   
   // State dan hooks untuk supplier
   const { suppliers, isLoading, createSupplier, updateSupplier, deleteSupplier } = useSupplier();
@@ -141,6 +205,14 @@ export default function InventoryMaster() {
     });
   }; // New handler for price group form data
   
+  const handleDrugClassInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setDrugClassFormData({
+      ...drugClassFormData,
+      [name]: value
+    });
+  }; // New handler for drug class form data
+  
   const handleAddNew = () => {
     setFormMode('add');
     
@@ -167,6 +239,15 @@ export default function InventoryMaster() {
         min_qty: 0,
         status: 'active'
       }); // Reset price group form data
+    } else if (activeTab === 'drug-classes') {
+      setDrugClassFormData({
+        id: '',
+        name: '',
+        symbol: '',
+        saleRequirements: '',
+        description: '',
+        status: 'active'
+      }); // Reset drug class form data
     } else {
       setFormData({
         id: '',
@@ -180,7 +261,7 @@ export default function InventoryMaster() {
     setIsDialogOpen(true);
   };
   
-  const handleEdit = (item: Category | Packaging | UnitSize | Location | Supplier | PriceGroup) => {
+  const handleEdit = (item: Category | Packaging | UnitSize | Location | Supplier | PriceGroup | DrugClassItem) => {
     setFormMode('edit');
     setCurrentItem(item);
     
@@ -209,6 +290,16 @@ export default function InventoryMaster() {
         min_qty: priceGroupItem.min_qty || 0,
         status: priceGroupItem.status || 'active'
       }); // Set price group form data
+    } else if (activeTab === 'drug-classes') {
+      const drugClassItem = item as DrugClassItem;
+      setDrugClassFormData({
+        id: drugClassItem.id || '',
+        name: drugClassItem.name || '',
+        symbol: drugClassItem.symbol || '',
+        saleRequirements: drugClassItem.saleRequirements || '',
+        description: drugClassItem.description || '',
+        status: drugClassItem.status || 'active'
+      }); // Set drug class form data
     } else {
       const genericItem = item as Category | Packaging | UnitSize | Location;
       setFormData({
@@ -312,6 +403,12 @@ export default function InventoryMaster() {
       } else {
         setPriceGroups(priceGroups.map(item => item.id === priceGroupFormData.id ? priceGroupFormData as PriceGroup : item));
       }
+    } else if (activeTab === 'drug-classes') {
+      if (formMode === 'add') {
+        setDrugClasses([...drugClasses, drugClassFormData as DrugClassItem]);
+      } else {
+        setDrugClasses(drugClasses.map(item => item.id === drugClassFormData.id ? drugClassFormData as DrugClassItem : item));
+      }
     }
     
     setIsDialogOpen(false);
@@ -340,6 +437,8 @@ export default function InventoryMaster() {
       setLocations(locations.filter(item => item.id !== id));
     } else if (activeTab === 'price-groups') {
       setPriceGroups(priceGroups.filter(item => item.id !== id));
+    } else if (activeTab === 'drug-classes') {
+      setDrugClasses(drugClasses.filter(item => item.id !== id));
     }
   };
 
@@ -372,6 +471,10 @@ export default function InventoryMaster() {
       case 'price-groups':
         title = 'Kelompok Harga';
         icon = <FaMoneyBillWave className="h-5 w-5 text-orange-500" />;
+        break;
+      case 'drug-classes':
+        title = 'Golongan Obat';
+        icon = <FaPills className="h-5 w-5 text-orange-500" />;
         break;
     }
     
@@ -608,6 +711,95 @@ export default function InventoryMaster() {
           </DialogContent>
         </Dialog>
       );
+    } else if (activeTab === 'drug-classes') {
+      return (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex items-center gap-2">
+                {icon}
+                <DialogTitle>{formMode === 'add' ? `Tambah ${title} Baru` : `Edit ${title}`}</DialogTitle>
+              </div>
+              <DialogDescription>
+                {formMode === 'add' 
+                  ? `Masukkan informasi untuk menambahkan ${title.toLowerCase()} baru.` 
+                  : `Ubah informasi ${title.toLowerCase()} yang ada.`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Nama Golongan Obat</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={drugClassFormData.name}
+                  onChange={handleDrugClassInputChange}
+                  placeholder="Masukkan nama golongan obat"
+                  className="w-full"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="symbol">Simbol</Label>
+                <Input
+                  id="symbol"
+                  name="symbol"
+                  value={drugClassFormData.symbol}
+                  onChange={handleDrugClassInputChange}
+                  placeholder="Masukkan simbol"
+                  className="w-full"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="saleRequirements">Persyaratan Penjualan</Label>
+                <Input
+                  id="saleRequirements"
+                  name="saleRequirements"
+                  value={drugClassFormData.saleRequirements}
+                  onChange={handleDrugClassInputChange}
+                  placeholder="Masukkan persyaratan penjualan"
+                  className="w-full"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="description">Deskripsi</Label>
+                <Input
+                  id="description"
+                  name="description"
+                  value={drugClassFormData.description}
+                  onChange={handleDrugClassInputChange}
+                  placeholder="Masukkan deskripsi"
+                  className="w-full"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <select
+                  id="status"
+                  name="status"
+                  value={drugClassFormData.status}
+                  onChange={handleDrugClassInputChange}
+                  className="w-full p-2 border border-gray-200 rounded-md"
+                >
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Tidak Aktif</option>
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Batal
+              </Button>
+              <Button 
+                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+                onClick={handleSave}
+              >
+                <FaSave className="mr-2 h-4 w-4" />
+                Simpan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      );
     } else {
       return (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -684,6 +876,7 @@ export default function InventoryMaster() {
       case 'locations': return locations;
       case 'suppliers': return suppliers;
       case 'price-groups': return priceGroups;
+      case 'drug-classes': return drugClasses;
       default: return [];
     }
   };
@@ -870,6 +1063,95 @@ export default function InventoryMaster() {
           </div>
         </div>
       );
+    } else if (activeTab === 'drug-classes') {
+      return (
+        <div className="p-6">
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  <TableHead className="w-[50px]">No</TableHead>
+                  <TableHead>Nama Golongan Obat</TableHead>
+                  <TableHead>Simbol</TableHead>
+                  <TableHead>Persyaratan Penjualan</TableHead>
+                  <TableHead>Deskripsi</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drugClasses && drugClasses.map((drugClass, index) => (
+                  <TableRow key={drugClass.id} className="hover:bg-gray-50">
+                    <TableCell className="text-center">{index + 1}</TableCell>
+                    <TableCell className="font-medium">{drugClass.name}</TableCell>
+                    <TableCell>
+                      <div 
+                        className="rounded-full flex items-center justify-center w-8 h-8" 
+                        style={{ fontSize: '1.5rem' }}
+                      >
+                        {drugClass.symbol}
+                      </div>
+                    </TableCell>
+                    <TableCell>{drugClass.saleRequirements}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{drugClass.description}</TableCell>
+                    <TableCell>
+                      <Badge className={
+                        drugClass.status === 'active' 
+                          ? "bg-green-100 text-green-800 border-green-200" 
+                          : "bg-red-100 text-red-800 border-red-200"
+                      }>
+                        {drugClass.status === 'active' ? 'Aktif' : 'Tidak Aktif'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end space-x-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                          onClick={() => handleEdit(drugClass)}
+                        >
+                          <FaPencilAlt className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => handleDelete(drugClass.id)}
+                        >
+                          <FaTrash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                
+                {(!drugClasses || drugClasses.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      Tidak ada data golongan obat tersedia
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          
+          <div className="mt-4 flex justify-between items-center">
+            <Button 
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+              onClick={handleAddNew}
+            >
+              <FaPlus className="mr-2 h-4 w-4" />
+              Tambah Golongan Obat Baru
+            </Button>
+            
+            <div className="text-sm text-gray-500">
+              Total: {drugClasses ? drugClasses.length : 0} golongan obat
+            </div>
+          </div>
+        </div>
+      );
     } else {
       return (
         <div className="p-6">
@@ -1039,6 +1321,13 @@ export default function InventoryMaster() {
                   >
                     <FaMoneyBillWave className="mr-1.5 h-4 w-4" />
                     Kelompok Harga
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="drug-classes" 
+                    className="rounded-md px-4 py-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                  >
+                    <FaPills className="mr-1.5 h-4 w-4" />
+                    Golongan Obat
                   </TabsTrigger>
                 </TabsList>
               </div>

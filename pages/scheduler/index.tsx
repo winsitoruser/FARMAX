@@ -1,13 +1,17 @@
-import Layout from '@/components/shared/layout'
-import SchedulerModule from '@/modules/scheduler/scheduler-module'
-import React from 'react'
-import dynamic from 'next/dynamic'
+import React from 'react';
+import SchedulerLayout from '@/components/layouts/scheduler-layout';
+import SchedulerModule from '@/modules/scheduler/scheduler-module';
+import Head from 'next/head';
 
 const SchedulerPage = () => {
   return (
-    <Layout>
+    <SchedulerLayout>
+      <Head>
+        <title>Manajemen Jadwal Shift - FARMAX</title>
+        <meta name="description" content="Kelola jadwal shift karyawan apotek FARMAX" />
+      </Head>
       <SchedulerModule />
-    </Layout>
+    </SchedulerLayout>
   )
 }
 
