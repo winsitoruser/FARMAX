@@ -13,7 +13,7 @@ const Layout: React.FC<LayoutProps> = ({ children, pageHeader }) => {
   const router = useRouter();
   const [showFooter, setShowFooter] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false); // Default to false for full-width layout
-  const [showHeader, setShowHeader] = useState(true);
+  const [showHeader, setShowHeader] = useState(false); // Always false to disable SimpleHeader
   
   useEffect(() => {
     // Check if we're in POS section
@@ -26,9 +26,8 @@ const Layout: React.FC<LayoutProps> = ({ children, pageHeader }) => {
     // Only show sidebar in POS section
     setShowSidebar(isPosSection);
     
-    // Show header on all pages except POS section
-    // Removed !isDashboard to show header on dashboard
-    setShowHeader(!isPosSection);
+    // Always set showHeader to false to disable SimpleHeader since we're using PosNavbar
+    setShowHeader(false);
     
     // Force a reflow to ensure proper rendering
     const timer = setTimeout(() => {
@@ -62,36 +61,36 @@ const Layout: React.FC<LayoutProps> = ({ children, pageHeader }) => {
       </div>
     </div>
   );
-};
+}
 
 // Helper functions to determine page title and subtitle based on route
-const getPageTitle = (pathname: string): string => {
+function getPageTitle(pathname: string): string {
   if (pathname.includes('/inventory')) return 'Inventory Management';
   if (pathname.includes('/finance')) return 'Financial Management';
   if (pathname.includes('/products')) return 'Product Catalog';
   return 'FARMAX';
-};
+}
 
-const getPageSubtitle = (pathname: string): string => {
+function getPageSubtitle(pathname: string): string {
   if (pathname.includes('/inventory')) return 'Manage your pharmacy inventory';
   if (pathname.includes('/finance')) return 'Track financial performance';
   if (pathname.includes('/products')) return 'Manage your product catalog';
   return 'Pharmacy Management System';
-};
+}
 
-const shouldShowBackButton = (pathname: string): boolean => {
+function shouldShowBackButton(pathname: string): boolean {
   // Show back button on detail pages but not on main section pages
   return pathname.includes('/detail/') || 
          pathname.includes('/edit/') || 
          pathname.includes('/add') ||
          (pathname.split('/').length > 2 && !pathname.endsWith('/'));
-};
+}
 
-const getBackUrl = (pathname: string): string => {
+function getBackUrl(pathname: string): string {
   if (pathname.includes('/inventory')) return '/inventory';
   if (pathname.includes('/finance')) return '/finance';
   if (pathname.includes('/products')) return '/products';
   return '/dashboard';
-};
+}
 
 export default Layout

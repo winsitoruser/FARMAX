@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -10,11 +10,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatRupiah } from '@/lib/utils';
-import dynamic from 'next/dynamic';
 import { FaArrowDown, FaExchangeAlt } from 'react-icons/fa';
-
-// Import dinamis untuk chart.js
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { 
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, CartesianGrid, XAxis, YAxis, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 interface InventoryImpactChartProps {
   data: any;
@@ -25,6 +27,12 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
   data, 
   isLoading 
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   if (!data && !isLoading) {
     return (
       <Card className="w-full">
@@ -39,172 +47,23 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
     );
   }
   
-  // Options untuk grafik perubahan stok (Bar chart)
-  const stockChangesOptions = {
-    chart: {
-      id: 'stock-changes',
-      type: 'bar' as const,
-      stacked: false,
-      toolbar: {
-        show: true
-      },
-      animations: {
-        enabled: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#2563eb', '#f97316'],
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: '60%',
-        endingShape: 'rounded',
-        borderRadius: 4
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    stroke: {
-      show: true,
-      width: 2,
-      colors: ['transparent']
-    },
-    grid: {
-      borderColor: '#f1f1f1',
-      row: {
-        colors: ['transparent', 'transparent'],
-        opacity: 0.5
-      }
-    },
-    xaxis: {
-      categories: data?.stockChanges?.labels || [],
-      title: {
-        text: 'Kategori Produk'
-      },
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Jumlah Stok'
-      },
-      labels: {
-        formatter: (value: number) => value.toFixed(0)
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => `${value.toFixed(0)} unit`
-      }
-    },
-    fill: {
-      opacity: 1
-    },
-    legend: {
-      position: 'top' as const,
-      horizontalAlign: 'right' as const,
-      floating: false,
-      offsetY: -25,
-      offsetX: -5
-    }
-  };
+  // Format data for stock changes for Recharts
+  const stockChangesData = data?.stockChanges?.labels?.map((label: string, index: number) => ({
+    category: label,
+    "Stok Awal": data.stockChanges.datasets[0].data[index],
+    "Stok Akhir": data.stockChanges.datasets[1].data[index]
+  })) || [];
 
-  // Series untuk grafik perubahan stok
-  const stockChangesSeries = data?.stockChanges?.datasets ? [
-    {
-      name: 'Stok Awal',
-      data: data.stockChanges.datasets[0].data
-    },
-    {
-      name: 'Stok Akhir',
-      data: data.stockChanges.datasets[1].data
-    }
-  ] : [];
-  
-  // Options untuk grafik tingkat perputaran (Line chart)
-  const turnoverRateOptions = {
-    chart: {
-      id: 'turnover-rate',
-      type: 'line' as const,
-      toolbar: {
-        show: true
-      },
-      animations: {
-        enabled: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#f97316'],
-    stroke: {
-      curve: 'smooth' as const,
-      width: 3
-    },
-    grid: {
-      borderColor: '#f1f1f1',
-      row: {
-        colors: ['transparent', 'transparent'],
-        opacity: 0.5
-      }
-    },
-    markers: {
-      size: 5,
-      colors: ['#f97316'],
-      strokeColors: '#fff',
-      strokeWidth: 2,
-      hover: {
-        size: 7
-      }
-    },
-    xaxis: {
-      categories: data?.turnoverRate?.labels || [],
-      title: {
-        text: 'Kategori Produk'
-      },
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Tingkat Perputaran'
-      },
-      labels: {
-        formatter: (value: number) => (value * 100).toFixed(1) + '%'
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => `${(value * 100).toFixed(1)}%`
-      }
-    },
-    legend: {
-      position: 'top' as const,
-      horizontalAlign: 'right' as const,
-      floating: false,
-      offsetY: -25,
-      offsetX: -5
-    }
-  };
-
-  // Series untuk grafik tingkat perputaran
-  const turnoverRateSeries = data?.turnoverRate ? [
-    {
-      name: 'Tingkat Perputaran',
-      data: data.turnoverRate.data
-    }
-  ] : [];
+  // Format data for turnover rate for Recharts
+  const turnoverRateData = data?.turnoverRate?.labels?.map((label: string, index: number) => ({
+    category: label,
+    turnover: data.turnoverRate.data[index]
+  })) || [];
 
   // Render komponen
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-md border-orange-100 overflow-hidden relative">
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
       <CardHeader>
         <CardTitle>Dampak Inventaris</CardTitle>
         <CardDescription>
@@ -229,13 +88,55 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
               <div>
                 <h3 className="text-lg font-medium mb-2">Perubahan Stok</h3>
                 <div className="h-[300px]">
-                  {typeof window !== 'undefined' && (
-                    <Chart
-                      options={stockChangesOptions}
-                      series={stockChangesSeries}
-                      type="bar"
-                      height={300}
-                    />
+                  {isMounted && (
+                    <ClientOnlyRecharts height={300}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={stockChangesData}
+                          margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                          <XAxis 
+                            dataKey="category" 
+                            tick={{ fontSize: 12 }}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => value.toFixed(0)} 
+                            label={{ value: 'Jumlah Stok', angle: -90, position: 'insideLeft', dy: 50 }}
+                          />
+                          <Tooltip 
+                            formatter={(value: any) => [`${value.toFixed(0)} unit`, '']}
+                            contentStyle={{ 
+                              fontSize: '12px',
+                              fontFamily: 'Inter, sans-serif',
+                              borderRadius: '4px'
+                            }}
+                          />
+                          <Legend 
+                            wrapperStyle={{ 
+                              fontSize: '12px',
+                              fontFamily: 'Inter, sans-serif',
+                              paddingTop: '20px'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="Stok Awal" 
+                            fill="#2563eb" 
+                            radius={[4, 4, 0, 0]}
+                            barSize={30}
+                          />
+                          <Bar 
+                            dataKey="Stok Akhir" 
+                            fill="#f97316" 
+                            radius={[4, 4, 0, 0]}
+                            barSize={30}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ClientOnlyRecharts>
                   )}
                 </div>
               </div>
@@ -243,20 +144,68 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
               <div>
                 <h3 className="text-lg font-medium mb-2">Tingkat Perputaran Stok</h3>
                 <div className="h-[200px]">
-                  {typeof window !== 'undefined' && (
-                    <Chart
-                      options={turnoverRateOptions}
-                      series={turnoverRateSeries}
-                      type="line"
-                      height={200}
-                    />
+                  {isMounted && (
+                    <ClientOnlyRecharts height={200}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={turnoverRateData}
+                          margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+                        >
+                          <defs>
+                            <linearGradient id="colorTurnover" x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#fdba74" stopOpacity={0.8}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                          <XAxis 
+                            dataKey="category" 
+                            tick={{ fontSize: 12 }}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => `${(value * 100).toFixed(1)}%`} 
+                            label={{ value: 'Tingkat Perputaran', angle: -90, position: 'insideLeft', dy: 40 }}
+                          />
+                          <Tooltip 
+                            formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, 'Tingkat Perputaran']}
+                            contentStyle={{ 
+                              fontSize: '12px',
+                              fontFamily: 'Inter, sans-serif',
+                              borderRadius: '4px'
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="turnover" 
+                            stroke="url(#colorTurnover)" 
+                            strokeWidth={3}
+                            dot={{ 
+                              r: 5,
+                              stroke: '#f97316',
+                              strokeWidth: 2,
+                              fill: '#fff'
+                            }}
+                            activeDot={{ 
+                              r: 7,
+                              stroke: '#f97316',
+                              strokeWidth: 2,
+                              fill: '#fff'
+                            }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ClientOnlyRecharts>
                   )}
                 </div>
               </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="text-sm font-medium text-gray-500">Total Pengurangan Stok</div>
                   <div className="text-2xl font-bold mt-1 flex items-center gap-2">
@@ -269,21 +218,24 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="text-sm font-medium text-gray-500">Nilai Stok Sebelum</div>
                   <div className="text-2xl font-bold mt-1">{formatRupiah(data?.summary?.stockValue?.before)}</div>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="text-sm font-medium text-gray-500">Nilai Stok Sesudah</div>
                   <div className="text-2xl font-bold mt-1">{formatRupiah(data?.summary?.stockValue?.after)}</div>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="text-sm font-medium text-gray-500">Selisih Nilai Stok</div>
                   <div className="text-2xl font-bold mt-1">{formatRupiah(data?.summary?.stockValue?.difference)}</div>
@@ -292,31 +244,31 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-gray-500 mb-1">Perputaran Tertinggi</div>
                       <div className="text-lg font-bold">{data?.summary?.highestTurnover}</div>
                     </div>
-                    <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-                      <FaExchangeAlt size={10} />
-                      <span>Cepat</span>
+                    <Badge className="px-2 py-1 bg-green-100 text-green-700 rounded-lg">
+                      {(data?.summary?.highestTurnoverRate * 100).toFixed(1)}%
                     </Badge>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="shadow-md border-orange-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-amber-500"></div>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-gray-500 mb-1">Perputaran Terendah</div>
                       <div className="text-lg font-bold">{data?.summary?.lowestTurnover}</div>
                     </div>
-                    <Badge className="bg-amber-100 text-amber-800 flex items-center gap-1">
-                      <FaExchangeAlt size={10} />
-                      <span>Lambat</span>
+                    <Badge className="px-2 py-1 bg-red-100 text-red-700 rounded-lg">
+                      {(data?.summary?.lowestTurnoverRate * 100).toFixed(1)}%
                     </Badge>
                   </div>
                 </CardContent>
@@ -325,11 +277,6 @@ const InventoryImpactChart: React.FC<InventoryImpactChartProps> = ({
           </>
         )}
       </CardContent>
-      <CardFooter className="bg-gray-50 border-t">
-        <div className="text-sm text-gray-500">
-          Pengurangan stok sebesar {data?.summary?.totalStockReduction.toLocaleString()} unit ({(data?.summary?.percentageReduction * 100).toFixed(1)}%) selama periode ini dengan perputaran tertinggi di kategori {data?.summary?.highestTurnover}
-        </div>
-      </CardFooter>
     </Card>
   );
 };

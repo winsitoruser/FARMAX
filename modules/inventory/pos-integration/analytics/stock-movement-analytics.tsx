@@ -19,17 +19,50 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { formatRupiah } from '@/lib/utils';
-import dynamic from 'next/dynamic';
 import { 
   FaChartPie, FaBoxes, FaArrowUp, FaArrowDown,
   FaExchangeAlt, FaFilter, FaDownload 
 } from 'react-icons/fa';
+import { 
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, CartesianGrid, XAxis, YAxis, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 import { POSIntegrationAPI } from '../services/api-service';
-import { errorManager } from '../services/error-service';
+import { POSErrorManager } from '../services/error-service';
 
 // Import dinamis untuk chart.js
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+// const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+
+// Utility function to retry operations with error handling
+const executeWithRetry = async (operation: () => Promise<any>, maxRetries = 3): Promise<any> => {
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      return await operation();
+    } catch (error) {
+      retries++;
+      if (retries >= maxRetries) {
+        console.error('Maximum retries exceeded:', error);
+        const errorManager = POSErrorManager.getInstance();
+        await errorManager.logError(
+          'stock-movement',
+          'fetch-data',
+          'error',
+          error instanceof Error ? error.message : 'Unknown error',
+          { error },
+          error instanceof Error ? error.stack : undefined
+        );
+        throw error;
+      }
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+    }
+  }
+};
 
 interface StockMovementAnalyticsProps {
   filters: {
@@ -58,45 +91,43 @@ const StockMovementAnalytics: React.FC<StockMovementAnalyticsProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Effect untuk memuat data analytics
   useEffect(() => {
     fetchStockMovementData();
   }, [filters]);
 
-  // Mengambil data pergerakan stok dari API
+  // Fungsi untuk memuat data analytics
   const fetchStockMovementData = async () => {
     setIsLoading(true);
     
     try {
       // Menggunakan error manager untuk menangani error
-      await errorManager.executeWithRetry(
+      await executeWithRetry(
         async () => {
           // Parameter dasar untuk request
           const params = {
-            startDate: filters.startDate.toISOString().split('T')[0],
-            endDate: filters.endDate.toISOString().split('T')[0],
-            branchId: filters.branchId === 'all' ? undefined : filters.branchId,
-            groupBy: 'category'
+            startDate: filters.startDate.toISOString(),
+            endDate: filters.endDate.toISOString(),
+            interval: filters.interval,
+            branchId: filters.branchId
           };
           
-          // Dalam kasus nyata, ini akan memanggil API
-          // const response = await POSIntegrationAPI.getStockMovementSummary(params);
-          // setAnalyticsData(response.data);
-          
-          // Untuk demo, gunakan data dummy
-          setAnalyticsData(generateDummyData());
-          setIsLoading(false);
-        },
-        'POS Analytics',
-        'fetchStockMovementData',
-        { severity: 'warning' }
+          // Mengambil data dari API
+          const response = await POSIntegrationAPI.getStockMovements(params);
+          setAnalyticsData(response.data);
+        }
       );
     } catch (error) {
-      console.error('Failed to fetch stock movement data:', error);
-      
-      // Set data dummy jika error
+      console.error('Failed to fetch stock movement analytics:', error);
+      // Untuk demo, gunakan data dummy jika API belum tersedia
       setAnalyticsData(generateDummyData());
+    } finally {
       setIsLoading(false);
     }
   };
@@ -267,63 +298,75 @@ const StockMovementAnalytics: React.FC<StockMovementAnalyticsProps> = ({
 
 // Komponen untuk analisis kategori
 const CategoryAnalysis: React.FC<{ data: any }> = ({ data }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   if (!data) return <div>Tidak ada data kategori</div>;
 
-  // Options untuk grafik perbandingan kategori (Pie chart)
-  const categoryOptions = {
-    chart: {
-      type: 'pie' as const,
-      toolbar: {
-        show: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#ff6b35', '#f7c59f', '#ffdc5e', '#8d99ae', '#5aa9e6', '#9a348e', '#2a9d8f'],
-    labels: data.labels,
-    legend: {
-      position: 'bottom' as const
-    },
-    dataLabels: {
-      enabled: true,
-      formatter: (val: number) => `${Math.round(val)}%`
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => `${value.toLocaleString()} unit`
-      }
-    },
-    responsive: [{
-      breakpoint: 480,
-      options: {
-        chart: {
-          width: 300
-        },
-        legend: {
-          position: 'bottom' as const
-        }
-      }
-    }]
-  };
+  // Custom colors for pie chart
+  const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#fde68a', '#fcd34d'];
+  
+  // Format data for Recharts
+  const formattedPieData = data.labels.map((label: string, index: number) => ({
+    name: label,
+    value: data.values[index]
+  }));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card className="shadow-md border-orange-100">
+          <Card className="shadow-md border-orange-100 overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
             <CardHeader>
               <CardTitle className="text-lg">Distribusi Pergerakan Stok per Kategori</CardTitle>
               <CardDescription>Perbandingan unit yang terjual berdasarkan kategori produk</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-[350px]">
-                {typeof window !== 'undefined' && (
-                  <Chart
-                    options={categoryOptions}
-                    series={data.values}
-                    type="pie"
-                    height={350}
-                    width="100%"
-                  />
+                {isMounted && (
+                  <ClientOnlyRecharts height={350}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={formattedPieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          outerRadius={120}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: { name: string; percent: number }) => 
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {formattedPieData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <Legend 
+                          layout="horizontal" 
+                          verticalAlign="bottom" 
+                          align="center"
+                          wrapperStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif'
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
                 )}
               </div>
             </CardContent>
@@ -374,67 +417,47 @@ const CategoryAnalysis: React.FC<{ data: any }> = ({ data }) => {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {typeof window !== 'undefined' && (
-              <Chart
-                options={{
-                  chart: {
-                    type: 'bar' as const,
-                    stacked: false,
-                    toolbar: {
-                      show: true
-                    },
-                    fontFamily: 'Inter, sans-serif'
-                  },
-                  colors: ['#2a9d8f', '#e76f51'],
-                  plotOptions: {
-                    bar: {
-                      horizontal: false,
-                      columnWidth: '55%',
-                      borderRadius: 5
-                    }
-                  },
-                  dataLabels: {
-                    enabled: false
-                  },
-                  stroke: {
-                    show: true,
-                    width: 2,
-                    colors: ['transparent']
-                  },
-                  xaxis: {
-                    categories: data.labels
-                  },
-                  yaxis: {
-                    title: {
-                      text: 'Unit'
-                    }
-                  },
-                  tooltip: {
-                    y: {
-                      formatter: (val: number) => `${val.toLocaleString()} unit`
-                    }
-                  },
-                  fill: {
-                    opacity: 1
-                  },
-                  legend: {
-                    position: 'top' as const,
-                    horizontalAlign: 'right' as const
-                  }
-                }}
-                series={[
-                  {
-                    name: 'Masuk',
-                    data: data.inValues
-                  },
-                  {
-                    name: 'Keluar',
-                    data: data.outValues
-                  }
-                ]}
-                type="bar"
-                height={300}
-              />
+            {isMounted && (
+              <ClientOnlyRecharts height={300}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data.byCategory}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                    <XAxis dataKey="category" />
+                    <YAxis 
+                      tickFormatter={(value) => `${value.toLocaleString()}`}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="in" 
+                      name="Stok Masuk" 
+                      fill="#f97316" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="out" 
+                      name="Stok Keluar" 
+                      fill="#64748b" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
             )}
           </div>
         </CardContent>
@@ -445,250 +468,222 @@ const CategoryAnalysis: React.FC<{ data: any }> = ({ data }) => {
 
 // Komponen untuk analisis timeline
 const TimelineAnalysis: React.FC<{ data: any }> = ({ data }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
   if (!data) return <div>Tidak ada data timeline</div>;
   
-  const timelineOptions = {
-    chart: {
-      type: 'area' as const,
-      height: 350,
-      toolbar: {
-        show: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#ff6b35', '#718096'],
-    fill: {
-      type: 'gradient',
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.7,
-        opacityTo: 0.3,
-        stops: [0, 90, 100],
-        colorStops: [
-          {
-            offset: 0,
-            color: '#ff6b35',
-            opacity: 0.8
-          },
-          {
-            offset: 100,
-            color: '#ffdc5e',
-            opacity: 0.2
-          }
-        ]
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    stroke: {
-      curve: 'smooth' as const,
-      width: 2
-    },
-    grid: {
-      borderColor: '#f1f1f1',
-    },
-    markers: {
-      size: 3,
-      colors: ['#ff6b35'],
-      strokeColors: '#fff',
-      strokeWidth: 2,
-      hover: {
-        size: 6
-      }
-    },
-    xaxis: {
-      categories: data.labels,
-      title: {
-        text: 'Tanggal'
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Unit'
-      }
-    },
-    tooltip: {
-      x: {
-        format: 'dd/MM/yy'
-      },
-      y: {
-        formatter: (val: number) => `${val.toLocaleString()} unit`
-      }
-    },
-    legend: {
-      position: 'top' as const,
-      horizontalAlign: 'right' as const
-    }
-  };
-  
+  // Format data for Recharts
+  const formattedTimelineData = data.labels.map((label: string, index: number) => ({
+    date: label,
+    in: data.series[0].data[index],
+    out: data.series[1].data[index]
+  }));
+
+  // Format data for stacked bar chart
+  const formattedBarData = data.byDay.map((item: any) => ({
+    day: item.day,
+    stockIn: item.in,
+    stockOut: item.out,
+    net: item.net
+  }));
+
   return (
     <div className="space-y-6">
-      <Card className="shadow-md border-orange-100">
-        <CardHeader>
-          <CardTitle className="text-lg">Tren Pergerakan Stok Harian</CardTitle>
-          <CardDescription>Pola pergerakan stok dari waktu ke waktu</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            {typeof window !== 'undefined' && (
-              <Chart
-                options={timelineOptions}
-                series={[
-                  {
-                    name: 'Keluar (POS)',
-                    data: data.outValues
-                  }
-                ]}
-                type="area"
-                height={350}
-              />
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="shadow-md border-orange-100">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader>
-            <CardTitle className="text-lg">Perbandingan Masuk/Keluar</CardTitle>
-            <CardDescription>Tren masuk dan keluar dalam periode yang sama</CardDescription>
+            <CardTitle className="text-lg">Tren Pergerakan Stok</CardTitle>
+            <CardDescription>Pola pergerakan stok masuk dan keluar dari waktu ke waktu</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {typeof window !== 'undefined' && (
-                <Chart
-                  options={{
-                    chart: {
-                      type: 'line' as const,
-                      height: 300,
-                      toolbar: {
-                        show: false
-                      },
-                      fontFamily: 'Inter, sans-serif'
-                    },
-                    colors: ['#2a9d8f', '#e76f51'],
-                    stroke: {
-                      curve: 'smooth' as const,
-                      width: 3
-                    },
-                    xaxis: {
-                      categories: data.labels.slice(-7) // Hanya tampilkan 7 hari terakhir
-                    },
-                    yaxis: {
-                      title: {
-                        text: 'Unit'
-                      }
-                    },
-                    markers: {
-                      size: 4
-                    },
-                    tooltip: {
-                      y: {
-                        formatter: (val: number) => `${val.toLocaleString()} unit`
-                      }
-                    },
-                    legend: {
-                      position: 'top' as const,
-                      horizontalAlign: 'right' as const
-                    }
-                  }}
-                  series={[
-                    {
-                      name: 'Masuk',
-                      data: data.inValues.slice(-7)
-                    },
-                    {
-                      name: 'Keluar',
-                      data: data.outValues.slice(-7)
-                    }
-                  ]}
-                  type="line"
-                  height={300}
-                />
+            <div className="h-[350px]">
+              {isMounted && (
+                <ClientOnlyRecharts height={350}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={formattedTimelineData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorStockIn" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                        </linearGradient>
+                        <linearGradient id="colorStockOut" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#64748b" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#64748b" stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                      <XAxis dataKey="date" />
+                      <YAxis 
+                        label={{ value: 'Unit', angle: -90, position: 'insideLeft' }}
+                        tickFormatter={(value) => `${value.toLocaleString()}`}
+                      />
+                      <Tooltip 
+                        formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                        contentStyle={{
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif',
+                          borderRadius: '4px'
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif'
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="in" 
+                        name="Stok Masuk"
+                        stroke="#f97316" 
+                        fillOpacity={1}
+                        fill="url(#colorStockIn)" 
+                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="out" 
+                        name="Stok Keluar"
+                        stroke="#64748b" 
+                        fillOpacity={1}
+                        fill="url(#colorStockOut)" 
+                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ClientOnlyRecharts>
               )}
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-md border-orange-100">
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader>
-            <CardTitle className="text-lg">Penjualan vs Stok Tersisa</CardTitle>
-            <CardDescription>Dampak penjualan pada level stok produk</CardDescription>
+            <CardTitle className="text-lg">Perbandingan Harian</CardTitle>
+            <CardDescription>Perbandingan stok masuk vs keluar per hari</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              {typeof window !== 'undefined' && (
-                <Chart
-                  options={{
-                    chart: {
-                      type: 'line' as const,
-                      height: 300,
-                      toolbar: {
-                        show: false
-                      },
-                      fontFamily: 'Inter, sans-serif'
-                    },
-                    colors: ['#e76f51', '#2a9d8f'],
-                    stroke: {
-                      curve: 'smooth' as const,
-                      width: [3, 2],
-                      dashArray: [0, 5]
-                    },
-                    xaxis: {
-                      categories: data.labels.slice(-7)
-                    },
-                    yaxis: [
-                      {
-                        title: {
-                          text: 'Unit Terjual'
-                        }
-                      },
-                      {
-                        opposite: true,
-                        title: {
-                          text: 'Stok Tersisa (%)'
-                        },
-                        min: 0,
-                        max: 100
-                      }
-                    ],
-                    markers: {
-                      size: 4
-                    },
-                    tooltip: {
-                      y: {
-                        formatter: (val: number, { seriesIndex }: { seriesIndex: number }) => {
-                          if (seriesIndex === 0) {
-                            return `${val.toLocaleString()} unit`;
-                          }
-                          return `${val.toFixed(1)}%`;
-                        }
-                      }
-                    },
-                    legend: {
-                      position: 'top' as const,
-                      horizontalAlign: 'right' as const
-                    }
-                  }}
-                  series={[
-                    {
-                      name: 'Unit Terjual',
-                      data: data.outValues.slice(-7)
-                    },
-                    {
-                      name: 'Stok Tersisa (%)',
-                      data: data.stockLevels.slice(-7)
-                    }
-                  ]}
-                  type="line"
-                  height={300}
-                />
+            <div className="h-[350px]">
+              {isMounted && (
+                <ClientOnlyRecharts height={350}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={formattedBarData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                      <XAxis dataKey="day" />
+                      <YAxis 
+                        tickFormatter={(value) => `${value.toLocaleString()}`}
+                      />
+                      <Tooltip 
+                        formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                        contentStyle={{
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif',
+                          borderRadius: '4px'
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif'
+                        }}
+                      />
+                      <Bar 
+                        dataKey="stockIn" 
+                        name="Stok Masuk" 
+                        fill="#f97316" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        dataKey="stockOut" 
+                        name="Stok Keluar" 
+                        fill="#64748b" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ClientOnlyRecharts>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
+      
+      <Card className="shadow-md border-orange-100">
+        <CardHeader>
+          <CardTitle className="text-lg">Penjualan vs Stok Tersisa</CardTitle>
+          <CardDescription>Dampak penjualan pada level stok produk</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            {isMounted && (
+              <ClientOnlyRecharts height={300}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={data.byDay}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                    <XAxis dataKey="day" />
+                    <YAxis 
+                      label={{ value: 'Unit', angle: -90, position: 'insideLeft' }}
+                      tickFormatter={(value) => `${value.toLocaleString()}`}
+                    />
+                    <YAxis 
+                      yAxisId="right" 
+                      orientation="right" 
+                      tickFormatter={(value) => `${value.toFixed(1)}%`}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="sold" 
+                      name="Unit Terjual"
+                      stroke="#f97316" 
+                      strokeWidth={2}
+                      yAxisId="left"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="stockLevel" 
+                      name="Stok Tersisa (%)"
+                      stroke="#64748b" 
+                      strokeWidth={2}
+                      yAxisId="right"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -715,12 +710,50 @@ const generateDummyData = () => {
                '11 Mar', '12 Mar', '13 Mar', '14 Mar', '15 Mar', '16 Mar', '17 Mar', '18 Mar', '19 Mar', 
                '20 Mar', '21 Mar', '22 Mar', '23 Mar', '24 Mar', '25 Mar', '26 Mar', '27 Mar', '28 Mar', 
                '29 Mar', '30 Mar'],
-      inValues: [110, 95, 80, 120, 85, 60, 75, 0, 145, 0, 0, 185, 0, 0, 95, 0, 200, 0, 0, 120, 0, 0, 
-                 185, 0, 0, 95, 0, 145, 0, 130],
-      outValues: [72, 68, 75, 82, 79, 45, 68, 73, 89, 91, 87, 65, 71, 63, 82, 76, 80, 72, 68, 75, 73, 
-                 79, 85, 92, 95, 89, 85, 82, 78, 82],
-      stockLevels: [95, 93, 91, 90, 88, 87, 85, 83, 82, 80, 78, 80, 79, 77, 75, 74, 78, 77, 75, 
-                    74, 73, 71, 70, 68, 66, 65, 63, 62, 61, 60]
+      series: [
+        {
+          name: 'Stok Masuk',
+          data: [110, 95, 80, 120, 85, 60, 75, 0, 145, 0, 0, 185, 0, 0, 95, 0, 200, 0, 0, 120, 0, 0, 
+                 185, 0, 0, 95, 0, 145, 0, 130]
+        },
+        {
+          name: 'Stok Keluar',
+          data: [72, 68, 75, 82, 79, 45, 68, 73, 89, 91, 87, 65, 71, 63, 82, 76, 80, 72, 68, 75, 73, 
+                 79, 85, 92, 95, 89, 85, 82, 78, 82]
+        }
+      ],
+      byDay: [
+        { day: '01 Mar', sold: 72, stockLevel: 95 },
+        { day: '02 Mar', sold: 68, stockLevel: 90 },
+        { day: '03 Mar', sold: 75, stockLevel: 88 },
+        { day: '04 Mar', sold: 82, stockLevel: 85 },
+        { day: '05 Mar', sold: 79, stockLevel: 82 },
+        { day: '06 Mar', sold: 45, stockLevel: 80 },
+        { day: '07 Mar', sold: 68, stockLevel: 78 },
+        { day: '08 Mar', sold: 73, stockLevel: 76 },
+        { day: '09 Mar', sold: 89, stockLevel: 74 },
+        { day: '10 Mar', sold: 91, stockLevel: 72 },
+        { day: '11 Mar', sold: 87, stockLevel: 70 },
+        { day: '12 Mar', sold: 65, stockLevel: 68 },
+        { day: '13 Mar', sold: 71, stockLevel: 66 },
+        { day: '14 Mar', sold: 63, stockLevel: 64 },
+        { day: '15 Mar', sold: 82, stockLevel: 62 },
+        { day: '16 Mar', sold: 76, stockLevel: 60 },
+        { day: '17 Mar', sold: 80, stockLevel: 58 },
+        { day: '18 Mar', sold: 72, stockLevel: 56 },
+        { day: '19 Mar', sold: 68, stockLevel: 54 },
+        { day: '20 Mar', sold: 75, stockLevel: 52 },
+        { day: '21 Mar', sold: 73, stockLevel: 50 },
+        { day: '22 Mar', sold: 79, stockLevel: 48 },
+        { day: '23 Mar', sold: 85, stockLevel: 46 },
+        { day: '24 Mar', sold: 92, stockLevel: 44 },
+        { day: '25 Mar', sold: 95, stockLevel: 42 },
+        { day: '26 Mar', sold: 89, stockLevel: 40 },
+        { day: '27 Mar', sold: 85, stockLevel: 38 },
+        { day: '28 Mar', sold: 82, stockLevel: 36 },
+        { day: '29 Mar', sold: 78, stockLevel: 34 },
+        { day: '30 Mar', sold: 82, stockLevel: 32 }
+      ]
     },
     summary: {
       totalTransactions: 548,

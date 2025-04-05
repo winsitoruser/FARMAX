@@ -16,9 +16,11 @@ import {
   FaPlus,
   FaSearch,
   FaBell,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaEye
 } from "react-icons/fa";
 import { formatRupiah } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 // Import API service
 import { inventoryAPI, InventoryStats } from "./services/inventory-api";
@@ -118,6 +120,85 @@ const InventoryModule: React.FC<InventoryModuleProps> = ({ onNavigate }) => {
     feature => feature.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
               feature.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Dummy data for inventory value distribution - Moved from dashboard
+  const inventoryItemsData = [
+    {
+      id: "PRD-001",
+      name: "Paracetamol 500mg",
+      category: "Obat Bebas",
+      stock: 2500,
+      minStock: 500,
+      totalValue: 12500000,
+      percentageOfTotal: 15.5
+    },
+    {
+      id: "PRD-002",
+      name: "Amoxicillin 500mg",
+      category: "Obat Keras",
+      stock: 1800,
+      minStock: 300,
+      totalValue: 18000000,
+      percentageOfTotal: 22.3
+    },
+    {
+      id: "PRD-003",
+      name: "Vitamin C 1000mg",
+      category: "Vitamin & Suplemen",
+      stock: 3200,
+      minStock: 600,
+      totalValue: 9600000,
+      percentageOfTotal: 11.9
+    },
+    {
+      id: "PRD-004",
+      name: "Antasida Tablet",
+      category: "Obat Bebas",
+      stock: 1200,
+      minStock: 250,
+      totalValue: 6000000,
+      percentageOfTotal: 7.4
+    },
+    {
+      id: "PRD-005",
+      name: "Cetirizine 10mg",
+      category: "Obat Bebas Terbatas",
+      stock: 980,
+      minStock: 200,
+      totalValue: 4900000,
+      percentageOfTotal: 6.1
+    },
+    {
+      id: "PRD-006",
+      name: "Misoprostol 200mcg",
+      category: "Obat Keras",
+      stock: 150,
+      minStock: 50,
+      totalValue: 7500000,
+      percentageOfTotal: 9.3
+    },
+    {
+      id: "PRD-007",
+      name: "Multivitamin Tablet",
+      category: "Vitamin & Suplemen",
+      stock: 2100,
+      minStock: 400,
+      totalValue: 10500000,
+      percentageOfTotal: 13.0
+    },
+    {
+      id: "PRD-008",
+      name: "Salbutamol Inhaler",
+      category: "Obat Keras",
+      stock: 320,
+      minStock: 80,
+      totalValue: 12800000,
+      percentageOfTotal: 15.9
+    }
+  ];
+
+  // Calculate total inventory value
+  const totalInventoryValue = inventoryItemsData.reduce((total, item) => total + item.totalValue, 0);
 
   return (
     <div className="space-y-6 p-6">
@@ -276,6 +357,111 @@ const InventoryModule: React.FC<InventoryModuleProps> = ({ onNavigate }) => {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Advanced Inventory Analysis - Added from dashboard */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+        {/* Nilai Inventory Detail Card */}
+        <Card className="border-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-red-500 to-orange-500"></div>
+          <CardHeader className="pb-0 pt-4 px-5">
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-lg font-bold text-gray-800">Nilai Inventory</CardTitle>
+                <CardDescription>Distribusi nilai inventory berdasarkan produk</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
+                <FaEye className="h-3.5 w-3.5 mr-1" /> Detail
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 h-[370px] flex flex-col">
+            <div className="overflow-auto flex-grow">
+              <table className="w-full">
+                <thead className="bg-gradient-to-r from-red-50 to-orange-50 text-xs font-medium text-gray-500 border-y border-gray-100 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Produk</th>
+                    <th className="px-5 py-3 text-left">Kategori</th>
+                    <th className="px-5 py-3 text-center">Stok</th>
+                    <th className="px-5 py-3 text-right">Nilai</th>
+                    <th className="px-5 py-3 text-right">% Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {inventoryItemsData.map((item, idx) => (
+                    <tr key={idx} className="text-sm text-gray-700 hover:bg-orange-50/30 transition-colors relative">
+                      {/* Background percentage bar */}
+                      <td colSpan={5} className="absolute inset-0 z-0">
+                        <div 
+                          className="h-full bg-gradient-to-r from-red-500/20 to-orange-500/20" 
+                          style={{ width: `${item.percentageOfTotal * 2.5}%` }}
+                        ></div>
+                      </td>
+                      
+                      {/* Actual table content */}
+                      <td className="px-5 py-3.5 whitespace-nowrap font-medium z-10 relative">
+                        <div className="flex items-center">
+                          <div className="w-1.5 h-8 bg-gradient-to-b from-red-500 to-orange-500 rounded-full mr-3 opacity-80"></div>
+                          <div>
+                            <div>{item.name}</div>
+                            <div className="text-xs text-gray-500">{item.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap relative z-10">
+                        <Badge 
+                          className={
+                            item.category === 'Obat Keras' ?
+                            "bg-red-50 text-red-700 hover:bg-red-50 border-red-200" :
+                            item.category === 'Obat Bebas' ?
+                            "bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200" :
+                            item.category === 'Vitamin & Suplemen' ?
+                            "bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200" :
+                            "bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200"
+                          }
+                        >
+                          {item.category}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-3.5 text-center whitespace-nowrap relative z-10">
+                        <div className="font-medium">{item.stock.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Min: {item.minStock}</div>
+                      </td>
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap font-medium text-gray-900 relative z-10">
+                        {formatRupiah(item.totalValue)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap relative z-10">
+                        <div className="font-medium text-orange-600">{item.percentageOfTotal.toFixed(1)}%</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-red-50/50 to-orange-50/50">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-xs text-orange-700 mb-1">Total Nilai Inventory</div>
+                  <div className="text-lg font-bold text-gray-800">{formatRupiah(totalInventoryValue)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-orange-700 mb-1">Total SKU</div>
+                  <div className="text-lg font-bold text-gray-800">{inventoryItemsData.length} produk</div>
+                </div>
+                <div>
+                  <div className="text-xs text-orange-700 mb-1">Kategori</div>
+                  <div className="text-lg font-bold text-gray-800">
+                    {new Set(inventoryItemsData.map(item => item.category)).size}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Leave space for potential second card */}
+        <div className="hidden xl:block"></div>
       </div>
 
       {/* Aktivitas Terbaru & Notifikasi */}

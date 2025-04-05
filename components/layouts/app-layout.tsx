@@ -54,58 +54,67 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-orange-50/30">
-      {/* POS Navbar - now sticky */}
-      <PosNavbar />
+      {/* POS Navbar - fixed position */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <PosNavbar 
+          scrolled={false} 
+          sidebarCollapsed={true} 
+          toggleSidebar={() => {}} 
+        />
+      </div>
       
-      {/* Main Content - add padding-top to account for sticky header */}
-      <div className="flex-1 flex flex-col h-full pt-16 md:pt-20">
-        {/* Page Content */}
-        <div className="flex-1 overflow-auto px-4 py-6 bg-orange-50/30">
-          {/* Breadcrumb Navigation */}
-          <Breadcrumbs items={breadcrumbItems} />
-          
-          {/* Decorative Header */}
-          <DecorativeHeader
-            title={title}
-            subtitle={subtitle}
-            icon={headerIcon}
-            actions={headerActions}
-            stats={headerStats}
-            colorScheme={colorScheme}
-          />
-          
-          {/* Content with Tabs if provided */}
-          <div className="mt-6">
-            {tabs ? (
-              <Tabs defaultValue={defaultTab || tabs[0].value} onValueChange={handleTabChange}>
-                <TabsList className="mb-6 bg-white p-1 rounded-lg shadow-sm">
+      {/* Main Content - with padding for fixed header */}
+      <div className="flex flex-col pt-16 min-h-screen">
+        <main className="flex-1 px-4 py-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Breadcrumb Navigation */}
+            <Breadcrumbs items={breadcrumbItems} />
+            
+            {/* Decorative Header */}
+            <DecorativeHeader
+              title={title}
+              subtitle={subtitle}
+              icon={headerIcon}
+              actions={headerActions}
+              stats={headerStats}
+              colorScheme={colorScheme}
+            />
+            
+            {/* Content with Tabs if provided */}
+            <div className="mt-6">
+              {tabs ? (
+                <Tabs defaultValue={defaultTab || tabs[0].value} onValueChange={handleTabChange}>
+                  <TabsList className="mb-6 bg-white p-1 rounded-lg shadow-sm">
+                    {tabs.map((tab) => (
+                      <TabsTrigger
+                        key={tab.value}
+                        value={tab.value}
+                        className="flex items-center gap-2 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800"
+                      >
+                        {tab.icon}
+                        {tab.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  
                   {tabs.map((tab) => (
-                    <TabsTrigger
-                      key={tab.value}
-                      value={tab.value}
-                      className="flex items-center gap-2 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800"
-                    >
-                      {tab.icon}
-                      {tab.label}
-                    </TabsTrigger>
+                    <TabsContent key={tab.value} value={tab.value}>
+                      {tab.content}
+                    </TabsContent>
                   ))}
-                </TabsList>
-                
-                {tabs.map((tab) => (
-                  <TabsContent key={tab.value} value={tab.value}>
-                    {tab.content}
-                  </TabsContent>
-                ))}
-              </Tabs>
-            ) : (
-              children
-            )}
+                </Tabs>
+              ) : (
+                children
+              )}
+            </div>
           </div>
+        </main>
+        
+        {/* Footer */}
+        <div className="mt-auto">
+          <Footer themeColor="orange" />
         </div>
       </div>
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 };

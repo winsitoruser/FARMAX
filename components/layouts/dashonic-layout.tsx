@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import DashonicSidebar from './dashonic-sidebar';
-import EnhancedHeader from './enhanced-header';
-import Footer from '@/components/dashboard/footer';
+import PosNavbar from '@/components/pos/pos-navbar';
+import Footer from '@/components/shared/footer';
 import { useRouter } from 'next/router';
 
 interface DashonicLayoutProps {
@@ -9,73 +8,53 @@ interface DashonicLayoutProps {
 }
 
 const DashonicLayout: React.FC<DashonicLayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCompactMode, setIsCompactMode] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const handleResize = () => {
+      // Keep window resize logic for responsiveness
       const width = window.innerWidth;
-      setIsMobile(width < 1024);
-      if (width < 1024) {
-        setIsSidebarOpen(false);
+    };
+
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
       } else {
-        setIsSidebarOpen(false);
+        setScrolled(false);
       }
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const toggleCompactMode = () => {
-    setIsCompactMode(!isCompactMode);
-  };
-
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Mobile overlay */}
-      {isMobile && isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={toggleSidebar}
-        />
-      )}
-
-      {/* Sidebar */}
-      <DashonicSidebar 
-        isOpen={isSidebarOpen} 
-        isCompact={isCompactMode}
-        toggleSidebar={toggleSidebar}
-        toggleCompactMode={toggleCompactMode}
+    <div className="min-h-screen flex flex-col bg-orange-50/30">
+      {/* Header with Farmanesia logo */}
+      <PosNavbar 
+        scrolled={scrolled} 
+        sidebarCollapsed={true} 
+        toggleSidebar={() => {}} 
       />
-
-      {/* Main content */}
-      <div className={`flex flex-col flex-1 transition-all duration-300 w-full ${
-        isCompactMode ? 'lg:ml-16' : 'lg:ml-60'
-      }`}>
-        {/* Unified header component handles visibility internally */}
-        <EnhancedHeader toggleSidebar={toggleSidebar} isCompact={isCompactMode} />
-
-        {/* Page content */}
-        <main className="flex-1 overflow-auto p-3 md:p-4">
-          <div className="max-w-[1280px] mx-auto px-0">
-            {children}
-          </div>
-        </main>
-
-        {/* Footer */}
-        <Footer 
-          themeColor="orange"
-          showSocialLinks={false}
-          statusOnline={true}
-        />
+      
+      <div className="flex flex-1 pt-16">
+        {/* Main Content - full width without sidebar */}
+        <div className="flex-1 transition-all duration-300">
+          <main className="p-4 md:p-6">
+            <div className="max-w-[1280px] mx-auto">
+              {children}
+            </div>
+          </main>
+          
+          <Footer themeColor="orange" />
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -19,11 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import dynamic from 'next/dynamic';
-import { FaBoxes, FaTag, FaExclamationTriangle } from 'react-icons/fa';
-
-// Import dinamis untuk chart.js
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { FaBoxes, FaTag, FaExclamationTriangle, FaArrowUp } from 'react-icons/fa';
+import { 
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, 
+  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Sector 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 interface TopProductsChartProps {
   data: any;
@@ -35,6 +36,12 @@ const TopProductsChart: React.FC<TopProductsChartProps> = ({
   isLoading 
 }) => {
   const [activeTab, setActiveTab] = useState('quantity');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   if (!data && !isLoading) {
     return (
@@ -49,369 +56,387 @@ const TopProductsChart: React.FC<TopProductsChartProps> = ({
       </Card>
     );
   }
-  
-  // Helper untuk menentukan warna badge berdasarkan dampak stok
-  const getStockImpactBadge = (impact: string) => {
-    switch (impact.toLowerCase()) {
-      case 'tinggi':
-        return <Badge className="bg-red-100 text-red-800">Tinggi</Badge>;
-      case 'sedang':
-        return <Badge className="bg-amber-100 text-amber-800">Sedang</Badge>;
-      case 'rendah':
-        return <Badge className="bg-green-100 text-green-800">Rendah</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800">{impact}</Badge>;
-    }
-  };
-  
-  // Options untuk grafik produk teratas berdasarkan kuantitas (Bar horizontal)
-  const quantityChartOptions = {
-    chart: {
-      id: 'top-products-quantity',
-      type: 'bar' as const,
-      toolbar: {
-        show: false
-      },
-      animations: {
-        enabled: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#ff6b35'],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: '70%',
-        borderRadius: 4,
-        distributed: true,
-        dataLabels: {
-          position: 'top'
-        }
-      }
-    },
-    dataLabels: {
-      enabled: true,
-      formatter: (val: number) => `${val}`,
-      textAnchor: 'start',
-      style: {
-        colors: ['#555']
-      },
-      offsetX: 30
-    },
-    grid: {
-      yaxis: {
-        lines: {
-          show: false
-        }
-      },
-      xaxis: {
-        lines: {
-          show: true
-        }
-      }
-    },
-    xaxis: {
-      categories: data?.byQuantity ? data.byQuantity.map((item: any) => item.productName).reverse() : [],
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    yaxis: {
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => `${value} unit`
-      }
-    },
-    legend: {
-      show: false
-    }
+
+  // Format the data for Recharts
+  const formatChartData = (type: 'quantity' | 'value') => {
+    if (!data || !data.topProducts) return [];
+    
+    const dataArray = type === 'quantity' ? data.topProducts.byQuantity : data.topProducts.byValue;
+    if (!dataArray) return [];
+    
+    return dataArray.map((item: any) => ({
+      name: item.name.length > 15 ? item.name.substring(0, 15) + '...' : item.name,
+      fullName: item.name,
+      value: type === 'quantity' ? item.quantity : item.value,
+      category: item.category,
+      stockLevel: item.stockLevel,
+      margin: item.margin
+    })).slice(0, 10); // Get top 10
   };
 
-  // Series untuk grafik produk teratas berdasarkan kuantitas
-  const quantityChartSeries = data?.byQuantity ? [
-    {
-      name: 'Kuantitas',
-      data: data.byQuantity.map((item: any) => item.quantity).reverse()
-    }
-  ] : [];
+  // Custom colors for charts
+  const COLORS = [
+    '#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', 
+    '#fde68a', '#fcd34d', '#fbbf24', '#f59e0b', '#d97706'
+  ];
   
-  // Options untuk grafik produk teratas berdasarkan nilai (Bar horizontal)
-  const valueChartOptions = {
-    chart: {
-      id: 'top-products-value',
-      type: 'bar' as const,
-      toolbar: {
-        show: false
-      },
-      animations: {
-        enabled: true
-      },
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#0075A2'],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: '70%',
-        borderRadius: 4,
-        distributed: true,
-        dataLabels: {
-          position: 'top'
-        }
-      }
-    },
-    dataLabels: {
-      enabled: true,
-      formatter: (val: number) => `${(val / 1000000).toFixed(1)} jt`,
-      textAnchor: 'start',
-      style: {
-        colors: ['#555']
-      },
-      offsetX: 30
-    },
-    grid: {
-      yaxis: {
-        lines: {
-          show: false
-        }
-      },
-      xaxis: {
-        lines: {
-          show: true
-        }
-      }
-    },
-    xaxis: {
-      categories: data?.byValue ? data.byValue.map((item: any) => item.productName).reverse() : [],
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    yaxis: {
-      labels: {
-        style: {
-          fontSize: '12px',
-          fontFamily: 'Inter, sans-serif'
-        }
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => formatRupiah(value)
-      }
-    },
-    legend: {
-      show: false
-    }
+  // For active shape of pie chart
+  const renderActiveShape = (props: any) => {
+    const RADIAN = Math.PI / 180;
+    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle,
+      fill, payload, percent, value } = props;
+    const sin = Math.sin(-RADIAN * midAngle);
+    const cos = Math.cos(-RADIAN * midAngle);
+    const sx = cx + (outerRadius + 10) * cos;
+    const sy = cy + (outerRadius + 10) * sin;
+    const mx = cx + (outerRadius + 30) * cos;
+    const my = cy + (outerRadius + 30) * sin;
+    const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+    const ey = my;
+    const textAnchor = cos >= 0 ? 'start' : 'end';
+
+    return (
+      <g>
+        <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={14} fontWeight="bold">
+          {payload.fullName.length > 20 ? payload.fullName.substring(0, 20) + '...' : payload.fullName}
+        </text>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          innerRadius={outerRadius + 6}
+          outerRadius={outerRadius + 10}
+          fill={fill}
+        />
+        <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+        <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fontSize={12} fill="#333">
+          {activeTab === 'quantity' ? `${value} unit` : formatRupiah(value)}
+        </text>
+        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" fontSize={10}>
+          {`(${(percent * 100).toFixed(1)}%)`}
+        </text>
+      </g>
+    );
   };
 
-  // Series untuk grafik produk teratas berdasarkan nilai
-  const valueChartSeries = data?.byValue ? [
-    {
-      name: 'Nilai',
-      data: data.byValue.map((item: any) => item.value).reverse()
-    }
-  ] : [];
+  // Prepare chart data
+  const quantityData = formatChartData('quantity');
+  const valueData = formatChartData('value');
 
-  // Render komponen
+  if (isLoading) {
+    return (
+      <Card className="w-full border-orange-200 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
+        <CardHeader>
+          <CardTitle>Produk Teratas</CardTitle>
+          <CardDescription>Produk dengan penjualan tertinggi</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Skeleton className="w-full h-[400px]" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Produk Teratas</CardTitle>
-        <CardDescription>
-          Analisis produk dengan penjualan tertinggi dan dampaknya terhadap inventaris
-        </CardDescription>
+    <Card className="w-full border-orange-200 overflow-hidden relative">
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-xl font-bold">Produk Teratas</CardTitle>
+          <CardDescription>
+            Analisis produk dengan penjualan tertinggi periode {data?.period}
+          </CardDescription>
+        </div>
+        <FaBoxes className="h-5 w-5 text-orange-500" />
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-            <div className="grid grid-cols-3 gap-4">
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
+        <Tabs 
+          defaultValue="quantity" 
+          value={activeTab} 
+          onValueChange={(val) => {
+            setActiveTab(val);
+            setActiveIndex(0);
+          }}
+          className="w-full"
+        >
+          <TabsList className="grid grid-cols-2 w-[250px] mb-4">
+            <TabsTrigger value="quantity">Berdasarkan Jumlah</TabsTrigger>
+            <TabsTrigger value="value">Berdasarkan Nilai</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="quantity" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                {isMounted && (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          activeIndex={activeIndex}
+                          activeShape={renderActiveShape}
+                          data={quantityData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          dataKey="value"
+                          onMouseEnter={(_, index) => setActiveIndex(index)}
+                        >
+                          {quantityData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: any) => [`${value} unit`, 'Jumlah']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
+                )}
+              </div>
+              
+              <div>
+                {isMounted && (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={quantityData}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                        <XAxis type="number" />
+                        <YAxis 
+                          type="category" 
+                          dataKey="name" 
+                          width={80}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          formatter={(value: any) => [`${value} unit`, 'Jumlah']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <Bar 
+                          dataKey="value" 
+                          name="Jumlah" 
+                          radius={[0, 4, 4, 0]}
+                        >
+                          {quantityData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
-                <TabsTrigger value="quantity" className="flex items-center gap-2">
-                  <FaBoxes size={14} />
-                  <span>Kuantitas</span>
-                </TabsTrigger>
-                <TabsTrigger value="value" className="flex items-center gap-2">
-                  <FaTag size={14} />
-                  <span>Nilai</span>
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="quantity" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
-                    <div className="h-[350px]">
-                      {typeof window !== 'undefined' && (
-                        <Chart
-                          options={quantityChartOptions}
-                          series={quantityChartSeries}
-                          type="bar"
-                          height={350}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="border rounded-lg p-4 h-[350px] overflow-y-auto">
-                      <h3 className="font-medium text-sm mb-3">Detail Produk Teratas (Kuantitas)</h3>
-                      <div className="space-y-4">
-                        {data?.byQuantity?.slice(0, 5).map((product: any, index: number) => (
-                          <div key={index} className="border-b pb-3">
-                            <div className="font-medium text-base">{product.productName}</div>
-                            <div className="text-sm text-gray-500 mb-2">{product.category}</div>
-                            <div className="flex items-center justify-between text-sm">
-                              <span>Kuantitas:</span>
-                              <span className="font-medium">{product.quantity} unit</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm mt-1">
-                              <span>Dampak Stok:</span>
-                              <span>{getStockImpactBadge(product.stockImpact)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="value" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
-                    <div className="h-[350px]">
-                      {typeof window !== 'undefined' && (
-                        <Chart
-                          options={valueChartOptions}
-                          series={valueChartSeries}
-                          type="bar"
-                          height={350}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="border rounded-lg p-4 h-[350px] overflow-y-auto">
-                      <h3 className="font-medium text-sm mb-3">Detail Produk Teratas (Nilai)</h3>
-                      <div className="space-y-4">
-                        {data?.byValue?.slice(0, 5).map((product: any, index: number) => (
-                          <div key={index} className="border-b pb-3">
-                            <div className="font-medium text-base">{product.productName}</div>
-                            <div className="text-sm text-gray-500 mb-2">{product.category}</div>
-                            <div className="flex items-center justify-between text-sm">
-                              <span>Nilai:</span>
-                              <span className="font-medium">{formatRupiah(product.value)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm mt-1">
-                              <span>Dampak Stok:</span>
-                              <span>{getStockImpactBadge(product.stockImpact)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
             
-            <div className="mt-6 border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produk</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead className="text-center">Kuantitas</TableHead>
-                    <TableHead className="text-right">Nilai</TableHead>
-                    <TableHead className="text-center">Dampak Stok</TableHead>
+                    <TableHead className="text-right">Terjual</TableHead>
+                    <TableHead className="text-right">Stok</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeTab === 'quantity' ? 
-                    data?.byQuantity?.map((product: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{product.productName}</TableCell>
-                        <TableCell>{product.category}</TableCell>
-                        <TableCell className="text-center">{product.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          {data?.byValue?.find((p: any) => p.productName === product.productName)?.value
-                            ? formatRupiah(data.byValue.find((p: any) => p.productName === product.productName).value)
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {getStockImpactBadge(product.stockImpact)}
-                        </TableCell>
-                      </TableRow>
-                    )) :
-                    data?.byValue?.map((product: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{product.productName}</TableCell>
-                        <TableCell>{product.category}</TableCell>
-                        <TableCell className="text-center">
-                          {data?.byQuantity?.find((p: any) => p.productName === product.productName)?.quantity || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">{formatRupiah(product.value)}</TableCell>
-                        <TableCell className="text-center">
-                          {getStockImpactBadge(product.stockImpact)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  }
+                  {data?.topProducts?.byQuantity?.slice(0, 5).map((product: any, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          ></div>
+                          {product.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{product.category}</TableCell>
+                      <TableCell className="text-right">{product.quantity}</TableCell>
+                      <TableCell className="text-right">
+                        {product.stockLevel < 10 ? (
+                          <div className="flex items-center justify-end gap-1 text-amber-600">
+                            <FaExclamationTriangle size={12} />
+                            <span>{product.stockLevel}</span>
+                          </div>
+                        ) : (
+                          product.stockLevel
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{product.margin}%</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
-          </>
-        )}
-      </CardContent>
-      <CardFooter className="bg-gray-50 border-t p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-          <div className="flex items-center gap-3">
-            <FaBoxes className="text-orange-500" size={18} />
-            <div>
-              <div className="text-sm text-gray-500">Kategori Terbanyak</div>
-              <div className="font-medium">{data?.summary?.topCategory}</div>
-            </div>
-          </div>
+          </TabsContent>
           
-          <div className="flex items-center gap-3">
-            <FaTag className="text-blue-500" size={18} />
-            <div>
-              <div className="text-sm text-gray-500">Kategori Nilai Tertinggi</div>
-              <div className="font-medium">{data?.summary?.highestValueCategory}</div>
+          <TabsContent value="value" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                {isMounted && (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          activeIndex={activeIndex}
+                          activeShape={renderActiveShape}
+                          data={valueData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          dataKey="value"
+                          onMouseEnter={(_, index) => setActiveIndex(index)}
+                        >
+                          {valueData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: any) => [formatRupiah(value), 'Nilai']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
+                )}
+              </div>
+              
+              <div>
+                {isMounted && (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={valueData}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                        <XAxis type="number" />
+                        <YAxis 
+                          type="category" 
+                          dataKey="name" 
+                          width={80}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          formatter={(value: any) => [formatRupiah(value), 'Nilai']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <Bar 
+                          dataKey="value" 
+                          name="Nilai" 
+                          radius={[0, 4, 4, 0]}
+                        >
+                          {valueData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
+                )}
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <FaExclamationTriangle className="text-red-500" size={18} />
-            <div>
-              <div className="text-sm text-gray-500">Produk Stok Kritis</div>
-              <div className="font-medium">{data?.summary?.criticalStockProducts} produk</div>
+            
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produk</TableHead>
+                    <TableHead>Kategori</TableHead>
+                    <TableHead className="text-right">Nilai</TableHead>
+                    <TableHead className="text-right">Stok</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.topProducts?.byValue?.slice(0, 5).map((product: any, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          ></div>
+                          {product.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{product.category}</TableCell>
+                      <TableCell className="text-right">{formatRupiah(product.value)}</TableCell>
+                      <TableCell className="text-right">
+                        {product.stockLevel < 10 ? (
+                          <div className="flex items-center justify-end gap-1 text-amber-600">
+                            <FaExclamationTriangle size={12} />
+                            <span>{product.stockLevel}</span>
+                          </div>
+                        ) : (
+                          product.stockLevel
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{product.margin}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
+        
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <div className="flex items-start gap-2">
+            <FaTag className="text-orange-500 mt-1" size={14} />
+            <div className="text-sm text-gray-600">
+              <p className="font-medium mb-1">Rekomendasi:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Produk {data?.insights?.topProduct} adalah produk terlaris dan perlu dijaga ketersediaannya</li>
+                <li>Produk dengan margin tinggi seperti {data?.insights?.highMarginProduct} berpotensi untuk promo bundling</li>
+                <li>Beberapa produk dengan stok rendah perlu segera dipesan kembali</li>
+              </ul>
             </div>
           </div>
         </div>
+      </CardContent>
+      <CardFooter className="border-t pt-4">
+        <p className="text-xs text-gray-500">
+          * Data diperbarui pada {new Date(data?.lastUpdated).toLocaleString('id-ID')}
+        </p>
       </CardFooter>
     </Card>
   );

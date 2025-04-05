@@ -1,4 +1,7 @@
 import '@/styles/global.scss'
+import 'slick-carousel/slick/slick.css'
+import 'slick-carousel/slick/slick-theme.css'
+import '@/styles/carousel.css'
 import type { AppProps } from 'next/app'
 import { Toaster } from 'react-hot-toast'
 import Layout from '@/components/shared/layout'

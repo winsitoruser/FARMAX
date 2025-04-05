@@ -32,19 +32,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ClientOnly from '@/components/common/client-only';
 
-// Dynamic import of Chart component to avoid SSR issues
-const Chart = dynamic(() => import('react-apexcharts'), { 
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-pulse flex space-x-2">
-        <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
-        <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
-        <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
-      </div>
-    </div>
-  )
-});
+import { 
+  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, 
+  Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // SortIcon component for table headers
 const SortIcon = ({ field }: { field: string }) => {
@@ -836,6 +828,23 @@ const ModulePos = () => {
     ]
   };
 
+  // Format chart data for Recharts
+  const formattedWeeklySalesData = weeklySalesData.options.xaxis.categories.map((day, index) => ({
+    hari: day,
+    penjualan: weeklySalesData.series[0].data[index]
+  }));
+
+  const formattedMonthlySalesData = monthlySalesData.options.xaxis.categories.map((month, index) => ({
+    bulan: month,
+    penjualan: monthlySalesData.series[0].data[index]
+  }));
+
+  // Format category data for pie chart
+  const formattedCategorySalesData = categorySalesData.labels.map((label, index) => ({
+    name: label,
+    value: categorySalesData.series[index]
+  }));
+
   // Sample data for daily sales
   const dailySales = {
     totalSales: 3750000,
@@ -877,6 +886,64 @@ const ModulePos = () => {
         
       return direction === 'asc' ? sortVal : -sortVal;
     };
+  };
+
+  // Client-only chart component to avoid SSR issues
+  const RechartsAreaChart = ({ 
+    data, 
+    xAxisKey, 
+    areaKey, 
+    areaName, 
+    height = 300 
+  }: { 
+    data: Array<Record<string, any>>; 
+    xAxisKey: string; 
+    areaKey: string; 
+    areaName: string; 
+    height?: number;
+  }) => {
+    return (
+      <ClientOnlyRecharts height={height}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={data}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+            <XAxis 
+              dataKey={xAxisKey} 
+              tick={{ fontSize: 12, fontFamily: 'Inter, sans-serif', fill: '#666' }}
+            />
+            <YAxis 
+              tick={{ fontSize: 12, fontFamily: 'Inter, sans-serif', fill: '#666' }}
+            />
+            <Tooltip 
+              contentStyle={{
+                fontSize: '12px',
+                fontFamily: 'Inter, sans-serif',
+                borderRadius: '4px'
+              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey={areaKey} 
+              name={areaName}
+              stroke="#f97316" 
+              fillOpacity={1} 
+              fill="url(#colorSales)" 
+              activeDot={{ r: 6 }}
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </ClientOnlyRecharts>
+    );
   };
 
   return (
@@ -1350,14 +1417,12 @@ const ModulePos = () => {
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-orange-400 rounded-br-lg"></div>
                   
                   {mounted && (
-                    <ClientOnly>
-                      <Chart 
-                        options={dateFilterType === 'month' ? monthlySalesData.options : weeklySalesData.options}
-                        series={dateFilterType === 'month' ? monthlySalesData.series : weeklySalesData.series}
-                        type="area"
-                        height="100%"
-                      />
-                    </ClientOnly>
+                    <RechartsAreaChart 
+                      data={dateFilterType === 'month' ? formattedMonthlySalesData : formattedWeeklySalesData}
+                      xAxisKey={dateFilterType === 'month' ? 'bulan' : 'hari'}
+                      areaKey="penjualan"
+                      areaName="Total Penjualan"
+                    />
                   )}
                 </div>
                 
@@ -1422,36 +1487,43 @@ const ModulePos = () => {
                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-dashed border-orange-200 opacity-30"></div>
                       
                       {mounted && (
-                        <ClientOnly>
-                          <Chart 
-                            options={{
-                              chart: {
-                                type: 'pie',
-                              },
-                              labels: categorySalesData.labels,
-                              colors: categorySalesData.colors,
-                              legend: {
-                                position: 'bottom',
-                                fontSize: '12px',
-                                fontFamily: 'Inter, sans-serif',
-                              },
-                              responsive: [{
-                                breakpoint: 480,
-                                options: {
-                                  chart: {
-                                    height: 200
-                                  },
-                                  legend: {
-                                    position: 'bottom'
-                                  }
-                                }
-                              }]
-                            }}
-                            series={categorySalesData.series}
-                            type="pie"
-                            height="100%"
-                          />
-                        </ClientOnly>
+                        <ClientOnlyRecharts height={200}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie 
+                                data={formattedCategorySalesData}
+                                cx="50%" 
+                                cy="50%" 
+                                innerRadius={60} 
+                                outerRadius={80} 
+                                fill="#8884d8" 
+                                paddingAngle={5} 
+                                dataKey="value"
+                              >
+                                {formattedCategorySalesData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={categorySalesData.colors[index % categorySalesData.colors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip 
+                                formatter={(value: number) => [`${value}`, 'Jumlah']}
+                                contentStyle={{
+                                  fontSize: '12px',
+                                  fontFamily: 'Inter, sans-serif',
+                                  borderRadius: '4px'
+                                }}
+                              />
+                              <Legend
+                                layout="vertical"
+                                align="right"
+                                verticalAlign="middle"
+                                wrapperStyle={{
+                                  fontSize: '12px',
+                                  fontFamily: 'Inter, sans-serif'
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </ClientOnlyRecharts>
                       )}
                     </div>
                     

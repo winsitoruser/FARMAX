@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaBoxOpen, FaChartBar, FaExchangeAlt, FaCalendarTimes, 
   FaWarehouse, FaShoppingCart, FaClock, FaLayerGroup,
@@ -23,10 +23,12 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { formatRupiah } from '@/lib/utils';
-import dynamic from 'next/dynamic';
-
-// Impor dinamis untuk Chart.js untuk menghindari error SSR
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { 
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, CartesianGrid, XAxis, YAxis, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Data sampel untuk visualisasi
 const stockSummary = {
@@ -92,130 +94,46 @@ const lowStockProducts = [
   { id: 'P005', name: 'Omeprazole 20mg', category: 'Obat Keras', stock: 10, minStock: 30, value: 10 * 18000 }
 ];
 
+// Data untuk chart nilai stok per-bulan (6 bulan terakhir)
+const stockValueTrend = [
+  { month: 'Sep', value: 2560000000 },
+  { month: 'Okt', value: 2650000000 },
+  { month: 'Nov', value: 2730000000 },
+  { month: 'Des', value: 2820000000 },
+  { month: 'Jan', value: 2780000000 },
+  { month: 'Feb', value: 2842000000 }
+];
+
+// Data pergerakan stok dalam 7 hari terakhir
+const stockMovementData = [
+  { day: 'Senin', masuk: 350, keluar: 280 },
+  { day: 'Selasa', masuk: 420, keluar: 380 },
+  { day: 'Rabu', masuk: 380, keluar: 340 },
+  { day: 'Kamis', masuk: 430, keluar: 360 },
+  { day: 'Jumat', masuk: 520, keluar: 490 },
+  { day: 'Sabtu', masuk: 270, keluar: 250 },
+  { day: 'Minggu', masuk: 180, keluar: 120 }
+];
+
+// Data kategori produk untuk pie chart
+const categoryData = stockByCategory.map(item => ({
+  name: item.category,
+  value: item.percentage
+}));
+
+// Warna untuk chart kategori stok
+const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#fde68a'];
+
 const DashboardInventaris: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [selectedBranch, setSelectedBranch] = useState('all');
+  const [timeRange, setTimeRange] = useState('month');
+  const [isMounted, setIsMounted] = useState(false);
   
-  // Opsi chart untuk pergerakan stok
-  const stockMovementOptions = {
-    chart: {
-      type: 'area' as const,
-      toolbar: {
-        show: false
-      },
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#ff7b00', '#ff4500'],
-    fill: {
-      type: 'gradient',
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.7,
-        opacityTo: 0.2,
-        stops: [0, 90, 100]
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    stroke: {
-      curve: 'smooth' as const,
-      width: 2
-    },
-    xaxis: {
-      categories: stockMovement.labels
-    },
-    yaxis: {
-      labels: {
-        formatter: (value: number) => `${value} jt`
-      }
-    },
-    legend: {
-      position: 'top' as const,
-      horizontalAlign: 'right' as const,
-      floating: false
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => `${value} juta rupiah`
-      }
-    }
-  };
-  
-  // Opsi chart untuk kedaluwarsa per kategori
-  const expiryByCategoryOptions = {
-    chart: {
-      type: 'donut' as const,
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#FF5722', '#FF9800', '#FFC107', '#FFD54F', '#FFE082', '#FFECB3'],
-    labels: expiryByCategory.labels,
-    legend: {
-      position: 'bottom' as const
-    },
-    dataLabels: {
-      enabled: false
-    },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: '60%'
-        }
-      }
-    },
-    responsive: [{
-      breakpoint: 480,
-      options: {
-        chart: {
-          height: 300
-        },
-        legend: {
-          position: 'bottom' as const
-        }
-      }
-    }]
-  };
-  
-  // Opsi chart untuk stok per kategori
-  const stockByCategoryOptions = {
-    chart: {
-      type: 'bar' as const,
-      toolbar: {
-        show: false
-      },
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#ff7b00'],
-    plotOptions: {
-      bar: {
-        borderRadius: 4,
-        horizontal: true,
-        barHeight: '60%',
-        distributed: false
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    xaxis: {
-      categories: stockByCategory.map(item => item.category),
-      labels: {
-        formatter: (value: number) => `${Math.round(value/1000000)} jt`
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => formatRupiah(value)
-      }
-    }
-  };
-  
-  // Data stok per kategori
-  const stockByCategorySeries = [{
-    name: 'Nilai Stok',
-    data: stockByCategory.map(item => item.value)
-  }];
-  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <div className="w-full space-y-4">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -340,48 +258,147 @@ const DashboardInventaris: React.FC = () => {
       
       {/* Grafik dan detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Grafik pergerakan stok */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <FaChartBar className="text-orange-500" />
-              <span>Pergerakan Stok</span>
-            </CardTitle>
-            <CardDescription>
-              Tren penerimaan dan pengeluaran stok
-            </CardDescription>
+        {/* Stock Value Chart */}
+        <div className="col-span-2">
+          <Card className="border-orange-200 h-full overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
+            <CardHeader>
+              <CardTitle>Pergerakan Nilai Stok</CardTitle>
+              <CardDescription>Trend nilai stok 6 bulan terakhir</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isMounted ? (
+                <ClientOnlyRecharts height={300}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={stockValueTrend}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorStock" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                      <XAxis dataKey="month" />
+                      <YAxis 
+                        tickFormatter={(value) => `${Math.floor(value / 1000000000)}M`}
+                      />
+                      <Tooltip 
+                        formatter={(value: any) => [formatRupiah(Number(value)), 'Nilai Stok']}
+                        contentStyle={{
+                          fontSize: '12px',
+                          fontFamily: 'Inter, sans-serif',
+                          borderRadius: '4px'
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="#f97316" 
+                        fill="url(#colorStock)" 
+                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ClientOnlyRecharts>
+              ) : (
+                <div className="flex items-center justify-center h-[300px]">
+                  <div className="h-10 w-10 rounded-full border-3 border-t-transparent border-orange-500 animate-spin"></div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Stock by Category Chart */}
+        <Card className="border-orange-200 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
+          <CardHeader>
+            <CardTitle>Kategori Produk</CardTitle>
+            <CardDescription>Distribusi stok berdasarkan kategori</CardDescription>
           </CardHeader>
           <CardContent>
-            {typeof window !== 'undefined' && (
-              <Chart
-                options={stockMovementOptions}
-                series={stockMovement.series}
-                type="area"
-                height={320}
-              />
+            {isMounted ? (
+              <ClientOnlyRecharts height={250}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(1)}%`}
+                      labelLine={false}
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: any) => [`${value}%`, 'Persentase']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
+            ) : (
+              <div className="flex items-center justify-center h-[250px]">
+                <div className="h-10 w-10 rounded-full border-3 border-t-transparent border-orange-500 animate-spin"></div>
+              </div>
             )}
           </CardContent>
         </Card>
         
-        {/* Distribusi stok per kategori */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <FaLayerGroup className="text-orange-500" />
-              <span>Stok per Kategori</span>
-            </CardTitle>
-            <CardDescription>
-              Distribusi nilai stok berdasarkan kategori produk
-            </CardDescription>
+        {/* Stock Movement Chart */}
+        <Card className="border-orange-200 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
+          <CardHeader>
+            <CardTitle>Pergerakan Stok</CardTitle>
+            <CardDescription>Stok masuk dan keluar 7 hari terakhir</CardDescription>
           </CardHeader>
           <CardContent>
-            {typeof window !== 'undefined' && (
-              <Chart
-                options={stockByCategoryOptions}
-                series={stockByCategorySeries}
-                type="bar"
-                height={320}
-              />
+            {isMounted ? (
+              <ClientOnlyRecharts height={250}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={stockMovementData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <Tooltip 
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                    />
+                    <Bar dataKey="masuk" name="Stok Masuk" fill="#f97316" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="keluar" name="Stok Keluar" fill="#fb923c" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
+            ) : (
+              <div className="flex items-center justify-center h-[250px]">
+                <div className="h-10 w-10 rounded-full border-3 border-t-transparent border-orange-500 animate-spin"></div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -427,13 +444,43 @@ const DashboardInventaris: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {typeof window !== 'undefined' && (
-              <Chart
-                options={expiryByCategoryOptions}
-                series={expiryByCategory.series}
-                type="donut"
-                height={250}
-              />
+            {isMounted ? (
+              <ClientOnlyRecharts height={250}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={expiryByCategory.series.map((value, index) => ({
+                        name: expiryByCategory.labels[index],
+                        value
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(1)}%`}
+                      labelLine={false}
+                    >
+                      {expiryByCategory.series.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: any) => [`${value}%`, 'Persentase']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
+            ) : (
+              <div className="flex items-center justify-center h-[250px]">
+                <div className="h-10 w-10 rounded-full border-3 border-t-transparent border-orange-500 animate-spin"></div>
+              </div>
             )}
             <div className="mt-2 text-xs text-center text-gray-500">
               Total: {expiryByCategory.series.reduce((a, b) => a + b, 0)} produk

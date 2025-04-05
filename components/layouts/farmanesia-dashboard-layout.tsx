@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { FaBars } from 'react-icons/fa';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import DashonicSidebar from './dashonic-sidebar';
-import EnhancedHeader from './enhanced-header';
-import Footer from '@/components/dashboard/footer';
+import PosNavbar from '@/components/pos/pos-navbar';
+import Footer from '@/components/shared/footer';
+import VerticalSidebar from '@/components/shared/vertical-sidebar';
 import Image from 'next/image';
 import { 
   Select,
@@ -20,103 +20,93 @@ interface FarmanesiaDashboardLayoutProps {
 }
 
 const FarmanesiaDashboardLayout: React.FC<FarmanesiaDashboardLayoutProps> = ({ children, title }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCompactMode, setIsCompactMode] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
     
     const handleResize = () => {
-      if (typeof window !== 'undefined') {
-        const width = window.innerWidth;
-        setIsMobile(width < 1024);
-        if (width < 1024) {
-          setIsSidebarOpen(false);
-        } else {
-          // Keep sidebar in collapsed state on desktop
-          setIsSidebarOpen(false);
-        }
-      }
+      // Keep window resize logic for responsiveness
+      const width = window.innerWidth;
     };
-
+    
     const handleScroll = () => {
-      if (typeof window !== 'undefined') {
-        if (window.scrollY > 10) {
-          setScrolled(true);
-        } else {
-          setScrolled(false);
-        }
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
       }
     };
 
-    if (typeof window !== 'undefined') {
-      handleResize();
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('scroll', handleScroll);
-    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll);
     
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', handleResize);
-        window.removeEventListener('scroll', handleScroll);
-      }
-      setMounted(false);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const toggleCompactMode = () => {
-    setIsCompactMode(!isCompactMode);
-  };
-
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Mobile overlay */}
-      {isMobile && isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={toggleSidebar}
+    <div className="h-screen flex flex-col">
+      {/* Header */}
+      <div className="fixed top-0 right-0 left-0 z-50 bg-white shadow-sm">
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-600 to-amber-500"></div>
+        <PosNavbar 
+          scrolled={scrolled} 
+          sidebarCollapsed={sidebarCollapsed} 
+          toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          showBilling={true}
+          showBusinessSettings={true}
         />
-      )}
+      </div>
 
-      {/* Sidebar */}
-      <DashonicSidebar 
-        isOpen={isSidebarOpen} 
-        isCompact={isCompactMode}
-        toggleSidebar={toggleSidebar}
-        toggleCompactMode={toggleCompactMode}
-      />
-
-      {/* Main content */}
-      <div className={`flex flex-col flex-1 transition-all duration-300 w-full ${
-        isCompactMode ? 'lg:ml-16' : 'lg:ml-60'
-      }`}>
-        {/* Unified header component handles visibility internally */}
-        <EnhancedHeader toggleSidebar={toggleSidebar} isCompact={isCompactMode} />
-
-        {/* Main content */}
-        <main className="flex-1 overflow-auto px-3 pt-3 md:px-4 md:pt-4">
-          <div className="max-w-[1280px] mx-auto">
-            {/* Content */}
-            {children}
-          </div>
-        </main>
-
-        {/* Footer */}
-        <Footer 
-          themeColor="gray"
-          showSocialLinks={false}
-          statusOnline={true}
-          companyName="PT.Farmanesia Teknologi Solusi"
-        />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
+      
+      {/* Content Area with padding-top to account for fixed header */}
+      <div className="flex flex-1 mt-[4.5rem] ml-16 transition-all duration-300">
+        {/* Main scrollable content - full width without sidebar */}
+        <div className="flex-1 overflow-y-auto transition-all duration-300">
+          {/* Title and Period Selector */}
+          {title && mounted && (
+            <div className="bg-white border-b border-orange-100 p-4 sticky top-0 z-10">
+              <div className="max-w-[1280px] mx-auto flex justify-between items-center">
+                <h1 className="text-lg font-bold bg-gradient-to-r from-orange-600 to-amber-500 bg-clip-text text-transparent">
+                  {title}
+                </h1>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Periode:</span>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                    <SelectTrigger className="h-8 w-32 text-xs bg-white border-orange-200">
+                      <SelectValue placeholder="Pilih periode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Hari Ini</SelectItem>
+                      <SelectItem value="week">Minggu Ini</SelectItem>
+                      <SelectItem value="month">Bulan Ini</SelectItem>
+                      <SelectItem value="year">Tahun Ini</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <main className="p-4 md:p-6">
+            <div className="max-w-[1280px] mx-auto">
+              {children}
+            </div>
+          </main>
+          
+          <Footer />
+        </div>
       </div>
     </div>
   );

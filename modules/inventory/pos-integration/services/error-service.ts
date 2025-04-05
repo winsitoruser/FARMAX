@@ -1,5 +1,5 @@
 import { POSIntegrationAPI } from './api-service';
-import { toast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 
 // Tipe untuk Error Log
 export interface ErrorLog {
@@ -24,24 +24,25 @@ export interface ErrorResolution {
   autoRetry?: boolean;
 }
 
+// Informasi untuk retry operation
+interface RetryInfo {
+  operation: () => Promise<any>;
+  context: any;
+  retryCount: number;
+  lastError: any;
+  timeoutId?: NodeJS.Timeout;
+}
+
 // Kelas untuk manajemen error di integrasi POS
 export class POSErrorManager {
   private static instance: POSErrorManager;
   private errorQueue: Map<string, RetryInfo>;
   private maxRetries: number = 3;
   private retryDelays: number[] = [5000, 15000, 30000]; // 5 detik, 15 detik, 30 detik
-  
-  // Informasi untuk retry operation
-  private interface RetryInfo {
-    operation: () => Promise<any>;
-    context: any;
-    retryCount: number;
-    lastError: any;
-    timeoutId?: NodeJS.Timeout;
-  }
+  private toast: ReturnType<typeof useToast> | null = null;
   
   private constructor() {
-    this.errorQueue = new Map();
+    this.errorQueue = new Map<string, RetryInfo>();
   }
   
   public static getInstance(): POSErrorManager {
@@ -50,337 +51,311 @@ export class POSErrorManager {
     }
     return POSErrorManager.instance;
   }
-  
-  /**
-   * Log error ke server dan tangani sesuai severity
-   */
+
+  // Set toast function for notifications
+  public setToast(toast: ReturnType<typeof useToast>): void {
+    this.toast = toast;
+  }
+
+  // Log error ke server dan local storage
   public async logError(
-    error: any, 
-    module: string, 
-    operation: string, 
-    severity: 'warning' | 'error' | 'critical' = 'error',
-    context: any = {}
-  ): Promise<string | null> {
-    // Struktur error data yang akan di-log
-    const errorData = {
-      module,
-      operation,
-      severity,
-      message: error.message || 'Unknown error',
-      details: {
-        ...context,
-        code: error.code,
-        response: error.response?.data
-      },
-      stackTrace: error.stack
-    };
-    
+    module: string,
+    operation: string,
+    severity: ErrorLog['severity'],
+    message: string,
+    details: any,
+    stackTrace?: string
+  ): Promise<string> {
     try {
-      // Log error ke server
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/integration/pos/errors`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify(errorData)
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to log error to server', await response.json());
-        return null;
-      }
-      
-      const result = await response.json();
-      const errorId = result.id;
-      
-      // Notifikasi user berdasarkan severity
-      this.notifyUser(severity, errorData.message, module);
-      
-      return errorId;
-    } catch (logError) {
-      // Fallback jika gagal log ke server, log ke console
-      console.error('Failed to log error:', logError);
-      console.error('Original Error:', errorData);
-      return null;
+      const errorLog: ErrorLog = {
+        id: `ERR_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        timestamp: new Date().toISOString(),
+        module,
+        operation,
+        severity,
+        message,
+        details,
+        stackTrace,
+        resolved: false
+      };
+
+      // Simpan ke local storage untuk tracking
+      this.saveErrorToLocalStorage(errorLog);
+
+      // Kirim ke server jika koneksi tersedia - commented out until API is implemented
+      // try {
+      //   await POSIntegrationAPI.logError(errorLog);
+      // } catch (e) {
+      //   console.warn('Tidak dapat mengirim error log ke server. Menyimpan secara lokal.', e);
+      // }
+
+      // Tampilkan notifikasi user sesuai severity
+      this.showErrorNotification(errorLog);
+
+      return errorLog.id;
+    } catch (e) {
+      console.error('Error dalam logging error:', e);
+      return `ERR_FALLBACK_${Date.now()}`;
     }
   }
-  
-  /**
-   * Menampilkan notifikasi error ke user
-   */
-  private notifyUser(severity: 'warning' | 'error' | 'critical', message: string, module: string) {
-    const title = `${severity === 'critical' ? 'Error Kritis' : severity === 'error' ? 'Error' : 'Peringatan'} - ${module}`;
+
+  // Simpan error ke localStorage
+  private saveErrorToLocalStorage(errorLog: ErrorLog): void {
+    try {
+      const errors = this.getErrorsFromLocalStorage();
+      errors.push(errorLog);
+      
+      // Batasi jumlah error yang disimpan (simpan 100 error terakhir)
+      if (errors.length > 100) {
+        errors.shift();
+      }
+      
+      localStorage.setItem('pos_error_logs', JSON.stringify(errors));
+    } catch (e) {
+      console.error('Tidak dapat menyimpan error ke localStorage:', e);
+    }
+  }
+
+  // Mendapatkan semua error dari localStorage
+  private getErrorsFromLocalStorage(): ErrorLog[] {
+    try {
+      const errorsJson = localStorage.getItem('pos_error_logs');
+      return errorsJson ? JSON.parse(errorsJson) : [];
+    } catch (e) {
+      console.error('Tidak dapat mengambil error dari localStorage:', e);
+      return [];
+    }
+  }
+
+  // Menampilkan notifikasi error ke user
+  private showErrorNotification(errorLog: ErrorLog): void {
+    const title = `Error: ${errorLog.operation}`;
+    let message = errorLog.message;
     
-    switch (severity) {
-      case 'critical':
-        toast({
-          title,
+    // If toast function is not available, log to console
+    if (!this.toast) {
+      console.warn(`${title}: ${message}`);
+      return;
+    }
+    
+    switch (errorLog.severity) {
+      case 'warning':
+        this.toast.toast({
+          title: 'Warning',
           description: message,
-          variant: 'destructive',
-          duration: 10000 // 10 detik
+          variant: 'default',
         });
         break;
       case 'error':
-        toast({
-          title,
+        this.toast.toast({
+          title: title,
           description: message,
           variant: 'destructive',
-          duration: 7000 // 7 detik
         });
         break;
-      case 'warning':
-        toast({
-          title,
+      case 'critical':
+        this.toast.toast({
+          title: 'Kesalahan Kritis!',
           description: message,
-          variant: 'warning',
-          duration: 5000 // 5 detik
+          variant: 'destructive',
         });
         break;
     }
   }
-  
-  /**
-   * Menyelesaikan error yang tercatat
-   */
-  public async resolveError(errorId: string, resolution: ErrorResolution): Promise<boolean> {
-    try {
-      await POSIntegrationAPI.resolveError(errorId, resolution);
-      
-      // Jika autoRetry diaktifkan, coba lagi operasi
-      if (resolution.autoRetry && this.errorQueue.has(errorId)) {
-        const retryInfo = this.errorQueue.get(errorId)!;
-        this.retryOperation(errorId, retryInfo);
-      } else {
-        this.errorQueue.delete(errorId);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Failed to resolve error:', error);
-      return false;
-    }
-  }
-  
-  /**
-   * Menambahkan operasi ke queue untuk retry kemudian
-   */
-  public queueForRetry(
+
+  // Menambahkan operasi ke queue untuk retry
+  public addToRetryQueue(
     errorId: string, 
-    operation: () => Promise<any>, 
-    context: any,
-    error: any
+    operation: () => Promise<any>,
+    context: any = {}
   ): void {
-    this.errorQueue.set(errorId, {
+    const retryInfo: RetryInfo = {
       operation,
       context,
       retryCount: 0,
-      lastError: error
-    });
+      lastError: null
+    };
+    
+    this.errorQueue.set(errorId, retryInfo);
+    this.scheduleRetry(errorId);
   }
-  
-  /**
-   * Coba kembali operasi yang gagal
-   */
-  public retryOperation(errorId: string, retryInfo?: RetryInfo): void {
-    if (!retryInfo && this.errorQueue.has(errorId)) {
-      retryInfo = this.errorQueue.get(errorId)!;
-    }
+
+  // Menjadwalkan retry
+  private scheduleRetry(errorId: string): void {
+    const retryInfo = this.errorQueue.get(errorId);
     
     if (!retryInfo) {
       console.error(`No retry info found for error ID: ${errorId}`);
       return;
     }
     
-    // Batalkan timeout yang ada jika ada
-    if (retryInfo.timeoutId) {
-      clearTimeout(retryInfo.timeoutId);
-    }
-    
     if (retryInfo.retryCount >= this.maxRetries) {
-      console.log(`Max retries reached for error ID: ${errorId}`);
-      this.errorQueue.delete(errorId);
+      this.handleMaxRetriesExceeded(errorId, retryInfo);
       return;
     }
     
-    // Set timeout untuk retry
-    const delayIndex = Math.min(retryInfo.retryCount, this.retryDelays.length - 1);
-    const delay = this.retryDelays[delayIndex];
+    const delay = this.retryDelays[retryInfo.retryCount] || this.retryDelays[this.retryDelays.length - 1];
     
-    const timeoutId = setTimeout(async () => {
-      try {
-        console.log(`Retrying operation for error ID: ${errorId}, attempt: ${retryInfo!.retryCount + 1}`);
-        await retryInfo!.operation();
-        
-        // Jika berhasil, hapus dari queue
-        this.errorQueue.delete(errorId);
-        
-        // Notifikasi sukses
-        toast({
-          title: 'Operasi Berhasil',
-          description: 'Operasi yang sebelumnya gagal telah berhasil dijalankan',
-          variant: 'success',
-          duration: 3000
-        });
-      } catch (error) {
-        // Update retry info untuk percobaan berikutnya
-        retryInfo!.retryCount++;
-        retryInfo!.lastError = error;
-        this.errorQueue.set(errorId, retryInfo!);
-        
-        // Log error baru
-        this.logError(
-          error, 
-          retryInfo!.context.module || 'unknown', 
-          `${retryInfo!.context.operation || 'unknown'} (retry ${retryInfo!.retryCount})`,
-          retryInfo!.context.severity || 'error',
-          retryInfo!.context
-        );
-      }
+    retryInfo.timeoutId = setTimeout(() => {
+      this.executeRetry(errorId);
     }, delay);
     
-    // Update timeoutId
-    retryInfo.timeoutId = timeoutId;
     this.errorQueue.set(errorId, retryInfo);
   }
-  
-  /**
-   * Mendapatkan daftar error yang belum terselesaikan
-   */
-  public async getUnresolvedErrors(params: {
-    page?: number,
-    limit?: number,
-    module?: string,
-    severity?: 'warning' | 'error' | 'critical'
-  }): Promise<{ errors: ErrorLog[], total: number }> {
-    try {
-      const response = await POSIntegrationAPI.getErrorLogs({
-        ...params,
-        resolved: false
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get unresolved errors:', error);
-      return { errors: [], total: 0 };
-    }
-  }
-  
-  /**
-   * Mendapatkan statistik error
-   */
-  public async getErrorStats(): Promise<{
-    total: number;
-    critical: number;
-    error: number;
-    warning: number;
-    unresolvedByModule: { module: string; count: number }[];
-  }> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/integration/pos/errors/stats`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get error stats');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to get error stats:', error);
-      return {
-        total: 0,
-        critical: 0,
-        error: 0,
-        warning: 0,
-        unresolvedByModule: []
-      };
-    }
-  }
-  
-  /**
-   * Utility untuk menangani operasi dengan retry otomatis
-   */
-  public async executeWithRetry<T>(
-    operation: () => Promise<T>,
-    module: string,
-    operationName: string,
-    context: any = {},
-    maxRetries: number = this.maxRetries
-  ): Promise<T> {
-    let retryCount = 0;
+
+  // Eksekusi retry
+  private async executeRetry(errorId: string): Promise<void> {
+    const retryInfo = this.errorQueue.get(errorId);
     
-    while (true) {
-      try {
-        return await operation();
-      } catch (error: any) {
-        retryCount++;
-        
-        // Jika sudah melebihi maksimum retry, log error dan throw
-        if (retryCount > maxRetries) {
-          const errorId = await this.logError(
-            error,
-            module,
-            operationName,
-            context.severity || 'error',
-            { ...context, maxRetriesExceeded: true }
-          );
-          
-          if (errorId) {
-            this.queueForRetry(errorId, operation, {
-              module,
-              operation: operationName,
-              ...context
-            }, error);
-          }
-          
-          throw error;
-        }
-        
-        // Log warning dan coba lagi
-        console.warn(`Operation ${operationName} failed, retrying (${retryCount}/${maxRetries})...`, error);
-        
-        // Delay sebelum retry berikutnya
-        const delayIndex = Math.min(retryCount - 1, this.retryDelays.length - 1);
-        const delay = this.retryDelays[delayIndex];
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+    if (!retryInfo) {
+      console.error(`No retry info found for error ID: ${errorId}`);
+      return;
     }
+    
+    try {
+      await retryInfo.operation();
+      this.handleRetrySuccess(errorId);
+    } catch (error) {
+      retryInfo.lastError = error;
+      retryInfo.retryCount++;
+      this.errorQueue.set(errorId, retryInfo);
+      
+      console.warn(`Retry ${retryInfo.retryCount}/${this.maxRetries} failed for error ${errorId}:`, error);
+      
+      // Jadwalkan retry berikutnya
+      this.scheduleRetry(errorId);
+    }
+  }
+
+  // Handle ketika retry berhasil
+  private handleRetrySuccess(errorId: string): void {
+    // Update error log sebagai resolved
+    this.markErrorAsResolved(errorId, {
+      action: 'auto_retry_success',
+      notes: 'Operasi berhasil dieksekusi ulang secara otomatis.'
+    });
+    
+    // Hapus dari queue
+    this.removeFromRetryQueue(errorId);
+    
+    if (this.toast) {
+      this.toast.toast({
+        title: 'Operasi Berhasil',
+        description: 'Operasi yang sebelumnya gagal telah berhasil dieksekusi ulang.',
+        variant: 'default',
+      });
+    }
+  }
+
+  // Handle ketika maksimum retry tercapai
+  private handleMaxRetriesExceeded(errorId: string, retryInfo: RetryInfo): void {
+    // Hapus dari queue
+    this.removeFromRetryQueue(errorId);
+    
+    if (this.toast) {
+      this.toast.toast({
+        title: 'Operasi Gagal',
+        description: 'Sistem tidak dapat menyelesaikan operasi setelah beberapa kali percobaan. Silakan coba lagi nanti.',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  // Hapus dari retry queue
+  public removeFromRetryQueue(errorId: string): void {
+    const retryInfo = this.errorQueue.get(errorId);
+    
+    if (retryInfo && retryInfo.timeoutId) {
+      clearTimeout(retryInfo.timeoutId);
+    }
+    
+    this.errorQueue.delete(errorId);
+  }
+
+  // Menandai error sebagai resolved
+  public async markErrorAsResolved(
+    errorId: string,
+    resolution: ErrorResolution
+  ): Promise<boolean> {
+    try {
+      // Dapatkan error dari localStorage
+      const errors = this.getErrorsFromLocalStorage();
+      const errorIndex = errors.findIndex(e => e.id === errorId);
+      
+      if (errorIndex === -1) {
+        console.warn(`Error dengan ID ${errorId} tidak ditemukan`);
+        return false;
+      }
+      
+      // Update status error
+      const error = errors[errorIndex];
+      error.resolved = true;
+      error.resolvedAt = new Date().toISOString();
+      error.resolutionNotes = resolution.notes;
+      
+      // Simpan kembali ke localStorage
+      errors[errorIndex] = error;
+      localStorage.setItem('pos_error_logs', JSON.stringify(errors));
+      
+      // Update di server jika tersedia - commented out until API is implemented
+      // try {
+      //   await POSIntegrationAPI.updateErrorStatus(errorId, { resolved: true, resolution });
+      // } catch (e) {
+      //   console.warn('Tidak dapat memperbarui status error di server:', e);
+      // }
+      
+      return true;
+    } catch (e) {
+      console.error('Error dalam menandai error sebagai resolved:', e);
+      return false;
+    }
+  }
+
+  // Mendapatkan semua error logs
+  public getErrorLogs(): ErrorLog[] {
+    return this.getErrorsFromLocalStorage();
+  }
+
+  // Mendapatkan error log berdasarkan ID
+  public getErrorLogById(errorId: string): ErrorLog | undefined {
+    const errors = this.getErrorsFromLocalStorage();
+    return errors.find(e => e.id === errorId);
   }
 }
 
-// Singleton instance
-export const errorManager = POSErrorManager.getInstance();
-
 // HOC untuk wrapping API calls dengan error handling
-export const withErrorHandling = <T extends (...args: any[]) => Promise<any>>(
+export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   module: string,
   operation: string,
   context: any = {}
-): ((...args: Parameters<T>) => Promise<ReturnType<T>>) => {
+): (...args: Parameters<T>) => Promise<ReturnType<T>> {
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     try {
       return await fn(...args);
-    } catch (error: any) {
-      await errorManager.logError(error, module, operation, context.severity || 'error', {
-        ...context,
-        args
-      });
+    } catch (error) {
+      const errorManager = POSErrorManager.getInstance();
+      const errorId = await errorManager.logError(
+        module,
+        operation,
+        'error',
+        error instanceof Error ? error.message : 'Unknown error',
+        { context, args, error },
+        error instanceof Error ? error.stack : undefined
+      );
+      
       throw error;
     }
   };
-};
+}
 
 // Error codes untuk operasi POS Integration
 export const POS_ERROR_CODES = {
   SYNC_FAILED: 'POS_SYNC_001',
   CONNECTION_FAILED: 'POS_CONN_001',
-  AUTH_FAILED: 'POS_AUTH_001',
-  DATA_VALIDATION_FAILED: 'POS_DATA_001',
-  TRANSACTION_FAILED: 'POS_TRX_001',
-  INVENTORY_UPDATE_FAILED: 'POS_INV_001'
+  AUTHENTICATION_FAILED: 'POS_AUTH_001',
+  DATA_FORMAT_ERROR: 'POS_DATA_001',
+  INVALID_OPERATION: 'POS_OP_001',
+  SERVER_ERROR: 'POS_SRV_001',
+  UNKNOWN_ERROR: 'POS_UNK_001'
 };

@@ -1,6 +1,5 @@
 import dynamic from "next/dynamic";
 const PosLayout = dynamic(() => import("@/components/layouts/pos-layout"), { ssr: false });
-import PosHeader from "@/components/pos/pos-header";
 import { Breadcrumbs } from "@/components/common/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1196,206 +1195,40 @@ const KasirPage = () => {
     });
   };
 
-  // Create POS header with action buttons
-  const posHeader = (
-    <>
-      {/* Beautiful Header Card with Gradient Background */}
-      <div className="w-full mb-4 overflow-hidden rounded-lg shadow-md">
-        <div className="relative h-36">
-          {/* Gradient Background - elegant orange-red gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-orange-500 to-red-500">
-            {/* Decorative Elements */}
-            <div className="absolute top-8 right-8 w-24 h-24 rounded-full bg-white bg-opacity-10"></div>
-            <div className="absolute bottom-4 left-24 w-32 h-32 rounded-full bg-white bg-opacity-5"></div>
-            <div className="absolute -bottom-6 right-32 w-16 h-16 rounded-full bg-white bg-opacity-10"></div>
-            <div className="absolute right-4 top-4 flex space-x-1">
-              <div className="w-2 h-2 rounded-full bg-white opacity-60"></div>
-              <div className="w-2 h-2 rounded-full bg-white opacity-80"></div>
-              <div className="w-2 h-2 rounded-full bg-white"></div>
-            </div>
-            
-            {/* Elegant wave pattern */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden">
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-white bg-opacity-10" 
-                   style={{ borderRadius: "100% 100% 0 0" }}></div>
-            </div>
-          </div>
-          
-          {/* Content */}
-          <div className="relative h-full p-6 flex items-center">
-            <div className="flex items-center">
-              {/* Pharmacy Icon with floating shadow effect */}
-              <div className="flex-shrink-0 bg-white p-4 rounded-xl shadow-lg mr-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-orange-500 opacity-20 rounded-xl"></div>
-                <FaClinicMedical className="h-12 w-12 text-orange-600" />
-                <div className="absolute -right-1 -bottom-1 w-6 h-6 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full opacity-60"></div>
-              </div>
-              
-              {/* Text Content */}
-              <div className="text-white">
-                <h1 className="text-3xl font-bold tracking-tight mb-1">FARMAX Apotek</h1>
-                <p className="text-sm opacity-90 max-w-lg">
-                  Sistem point of sale untuk manajemen penjualan produk farmasi dan kesehatan
-                </p>
-                <div className="flex items-center mt-2 text-xs opacity-80">
-                  <div className="flex items-center mr-4 px-2 py-0.5 bg-white bg-opacity-20 rounded-full">
-                    <FaCashRegister className="mr-1" />
-                    <span>Kasir</span>
-                  </div>
-                  <div className="flex items-center mr-4">
-                    <FaMapMarkerAlt className="mr-1" />
-                    <span>Jl. Kesehatan No. 123, Jakarta</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaPhoneAlt className="mr-1" />
-                    <span>+62 812-3456-7890</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <PosHeader
-        title="Kasir"
-        description="Proses transaksi penjualan produk"
-        breadcrumbs={[
-          { title: "Dashboard", href: "/dashboard" },
-          { title: "Point of Sale", href: "/pos" },
-          { title: "Kasir", href: "/pos/kasir" },
-        ]}
-        actionButtons={
-          <>
-            <Button size="sm" variant="secondary" className="bg-white hover:bg-gray-100 text-orange-600">
-              <FaCalculator className="mr-2 h-4 w-4" />
-              Kalkulator
-            </Button>
-            <Button size="sm" variant="secondary" className="bg-white hover:bg-gray-100 text-orange-600 ml-2">
-              <FaClipboardList className="mr-2 h-4 w-4" />
-              Daftar Transaksi
-            </Button>
-          </>
-        }
-      />
-    </>
-  );
-
-  const handleNextStep = () => {
-    if (paymentStep === 'customer') {
-      setPaymentStep('payment');
-    } else if (paymentStep === 'payment') {
-      setIsPaymentProcessing(true);
-      setTimeout(() => {
-        setIsPaymentProcessing(false);
-        setIsPaymentModalOpen(false);
-        setIsReceiptModalOpen(true);
-        setPaymentStep('receipt');
-      }, 1500);
-    } else if (paymentStep === 'receipt') {
-      if (receiptOption === 'print') {
-        toast({
-          title: "Struk Berhasil Dicetak",
-          description: "Transaksi selesai",
-          variant: "default",
-        });
-      } else if (receiptOption === 'whatsapp') {
-        toast({
-          title: "Struk Dikirim via WhatsApp",
-          description: `Struk telah dikirim ke ${whatsappNumber || selectedCustomerData?.phone || 'pelanggan'}`,
-          variant: "default",
-        });
-      }
-      
-      setIsReceiptModalOpen(false);
-      setCart([]);
-      setSelectedPromo(null);
-      setCustomerType('walkin');
-      setPaymentStep('customer');
-      setReceiptOption('print');
-    }
-  };
-
-  // Function to handle clearing the cart
-  const handleClearCart = () => {
-    if (cart.length > 0) {
-      setCart([]);
-      toast({
-        title: "Keranjang Kosong",
-        description: "Semua item telah dihapus dari keranjang",
-        variant: "default",
-      });
-    }
-  };
-
-  // Available promotions
-  const availablePromos = [
-    { id: '1', code: 'DISC10', description: 'Diskon 10% untuk semua item', discountType: 'percentage', value: 10 },
-    { id: '2', code: 'FLAT20K', description: 'Potongan Rp 20.000 untuk pembelian min. Rp 100.000', discountType: 'fixed', value: 20000, minPurchase: 100000 },
-    { id: '3', code: 'BELI3GRATIS1', description: 'Beli 3 item dari kategori yang sama, gratis 1 item', discountType: 'buyXgetY', categoryMatch: true },
-  ];
-
   return (
     <PosLayout>
-      {/* Beautiful Header Card with Gradient Background */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 shadow-md">
-        <div className="relative h-36">
-          {/* Gradient Background - elegant orange-red gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-orange-500 to-red-500">
-            {/* Decorative Elements */}
-            <div className="absolute top-8 right-8 w-24 h-24 rounded-full bg-white bg-opacity-10"></div>
-            <div className="absolute bottom-4 left-24 w-32 h-32 rounded-full bg-white bg-opacity-5"></div>
-            <div className="absolute -bottom-6 right-32 w-16 h-16 rounded-full bg-white bg-opacity-10"></div>
-            <div className="absolute right-4 top-4 flex space-x-1">
-              <div className="w-2 h-2 rounded-full bg-white opacity-60"></div>
-              <div className="w-2 h-2 rounded-full bg-white opacity-80"></div>
-              <div className="w-2 h-2 rounded-full bg-white"></div>
-            </div>
-            
-            {/* Elegant wave pattern */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden">
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-white bg-opacity-10" 
-                   style={{ borderRadius: "100% 100% 0 0" }}></div>
-            </div>
+      <div className="max-w-[1280px] mx-auto">
+        {/* Breadcrumbs */}
+        <div className="mb-4">
+          <Breadcrumbs
+            items={[
+              { title: "Dashboard", href: "/dashboard" },
+              { title: "Point of Sale", href: "/pos" },
+              { title: "Kasir", href: "/pos/kasir" },
+            ]}
+          />
+        </div>
+
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">Kasir</h1>
+            <p className="text-sm text-gray-500">Proses transaksi penjualan produk</p>
           </div>
           
-          {/* Content */}
-          <div className="relative h-full p-6 flex items-center">
-            <div className="flex items-center">
-              {/* Pharmacy Icon with floating shadow effect */}
-              <div className="flex-shrink-0 bg-white p-4 rounded-xl shadow-lg mr-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-orange-500 opacity-20 rounded-xl"></div>
-                <FaClinicMedical className="h-12 w-12 text-orange-600" />
-                <div className="absolute -right-1 -bottom-1 w-6 h-6 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full opacity-60"></div>
-              </div>
-              
-              {/* Text Content */}
-              <div className="text-white">
-                <h1 className="text-3xl font-bold tracking-tight mb-1">FARMAX Apotek</h1>
-                <p className="text-sm opacity-90 max-w-lg">
-                  Sistem point of sale untuk manajemen penjualan produk farmasi dan kesehatan
-                </p>
-                <div className="flex items-center mt-2 text-xs opacity-80">
-                  <div className="flex items-center mr-4 px-2 py-0.5 bg-white bg-opacity-20 rounded-full">
-                    <FaCashRegister className="mr-1" />
-                    <span>Kasir</span>
-                  </div>
-                  <div className="flex items-center mr-4">
-                    <FaMapMarkerAlt className="mr-1" />
-                    <span>Jl. Kesehatan No. 123, Jakarta</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaPhoneAlt className="mr-1" />
-                    <span>+62 812-3456-7890</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="flex items-center space-x-2 mt-3 md:mt-0">
+            <Button 
+              size="sm" 
+              variant="default" 
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+              onClick={openNewTransactionDialog}
+            >
+              <FaPlus className="mr-1.5" size={14} />
+              Transaksi Baru
+            </Button>
           </div>
         </div>
-      </div>
-      
-      <div className="container mx-auto max-w-[1280px] px-4">
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
           {/* Left Section - Products */}
           <div className="lg:col-span-8 space-y-3">
@@ -1503,7 +1336,7 @@ const KasirPage = () => {
           {/* Right Section - Cart */}
           <div className="lg:col-span-4 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
             {/* Cart header with gradient */}
-            <div className="p-3 border-b border-gray-100 bg-gradient-to-r from-orange-100 to-orange-50">
+            <div className="p-3 border-b border-gray-100 bg-gradient-to-b from-orange-50 to-white">
               <div className="flex justify-between items-center">
                 <h2 className="text-white font-medium flex items-center">
                   <FaShoppingCart className="mr-2" size={16} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaChartBar, FaFileExport, FaBoxOpen, FaTags, 
   FaWarehouse, FaSort, FaSortUp, FaSortDown, FaDownload
@@ -31,10 +31,15 @@ import {
 import { formatRupiah } from '@/lib/utils';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import dynamic from 'next/dynamic';
+import { 
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, CartesianGrid, XAxis, YAxis, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Import dinamis untuk chart.js
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+// const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 // Data sampel untuk stok
 const sampleStockData = [
@@ -99,6 +104,11 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   const itemsPerPage = 10;
   
@@ -182,92 +192,20 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
     return sortOrder === 'asc' ? <FaSortUp size={14} /> : <FaSortDown size={14} />;
   };
   
-  // Opsi chart untuk kategori
-  const categoryChartOptions = {
-    chart: {
-      type: 'donut' as const,
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#FF5722', '#FF9800', '#FFC107', '#4CAF50', '#2196F3', '#9C27B0'],
-    labels: filteredCategorySummary.map(item => item.category),
-    legend: {
-      position: 'bottom' as const
-    },
-    dataLabels: {
-      enabled: true,
-      formatter: (val: number) => `${Math.round(val)}%`
-    },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: '60%'
-        }
-      }
-    },
-    responsive: [{
-      breakpoint: 480,
-      options: {
-        chart: {
-          height: 300
-        },
-        legend: {
-          position: 'bottom' as const
-        }
-      }
-    }]
-  };
+  // Format data for Recharts
+  const formattedCategoryData = filteredCategorySummary.map(item => ({
+    name: item.category,
+    value: item.totalStock
+  }));
   
-  // Series chart untuk kategori
-  const categorySeries = filteredCategorySummary.map(item => item.totalStock);
+  // Format data for branch bar chart
+  const formattedBranchData = filteredBranchSummary.map(item => ({
+    name: item.branch,
+    value: item.totalValue
+  }));
   
-  // Opsi chart untuk cabang
-  const branchChartOptions = {
-    chart: {
-      type: 'bar' as const,
-      toolbar: {
-        show: false
-      },
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#ff7b00'],
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: '60%',
-        borderRadius: 4
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    xaxis: {
-      categories: filteredBranchSummary.map(item => item.branch),
-      labels: {
-        style: {
-          fontSize: '12px'
-        }
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Nilai Stok (jt)'
-      },
-      labels: {
-        formatter: (value: number) => `${Math.round(value/1000000)} jt`
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => formatRupiah(value)
-      }
-    }
-  };
-  
-  // Series chart untuk cabang
-  const branchSeries = [{
-    name: 'Nilai Stok',
-    data: filteredBranchSummary.map(item => item.totalValue)
-  }];
+  // Custom colors for pie chart
+  const CATEGORY_COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#fde68a'];
   
   return (
     <div className="space-y-4">
@@ -356,7 +294,8 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Chart stok per kategori */}
-            <Card>
+            <Card className="shadow-md border-orange-100 overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -369,13 +308,48 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {typeof window !== 'undefined' && filteredCategorySummary.length > 0 ? (
-                  <Chart
-                    options={categoryChartOptions}
-                    series={categorySeries}
-                    type="donut"
-                    height={300}
-                  />
+                {isMounted && filteredCategorySummary.length > 0 ? (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={formattedCategoryData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          outerRadius={110}
+                          innerRadius={70}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: { name: string; percent: number }) => 
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {formattedCategoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => [`${value.toLocaleString()} unit`, 'Jumlah']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <Legend 
+                          layout="horizontal" 
+                          verticalAlign="bottom" 
+                          align="center"
+                          wrapperStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            paddingTop: '20px'
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-gray-500">
                     Tidak ada data kategori untuk ditampilkan
@@ -385,7 +359,8 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
             </Card>
             
             {/* Chart stok per cabang */}
-            <Card>
+            <Card className="shadow-md border-orange-100 overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -398,13 +373,56 @@ const LaporanStok: React.FC<LaporanStokProps> = ({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {typeof window !== 'undefined' && filteredBranchSummary.length > 0 ? (
-                  <Chart
-                    options={branchChartOptions}
-                    series={branchSeries}
-                    type="bar"
-                    height={300}
-                  />
+                {isMounted && filteredBranchSummary.length > 0 ? (
+                  <ClientOnlyRecharts height={300}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={formattedBranchData}
+                        margin={{ top: 10, right: 30, left: 10, bottom: 40 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{ fontSize: 11 }}
+                          angle={-45}
+                          textAnchor="end"
+                          interval={0}
+                        />
+                        <YAxis 
+                          tickFormatter={(value) => `${Math.round(value/1000000)} jt`}
+                          label={{ value: 'Nilai Stok (jt)', angle: -90, position: 'insideLeft', dy: 50 }}
+                        />
+                        <Tooltip 
+                          formatter={(value: any) => [formatRupiah(value), 'Nilai Stok']}
+                          contentStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{
+                            fontSize: '12px',
+                            fontFamily: 'Inter, sans-serif',
+                            paddingTop: '20px'
+                          }}
+                        />
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f97316" stopOpacity={0.8}/>
+                            <stop offset="100%" stopColor="#fdba74" stopOpacity={0.5}/>
+                          </linearGradient>
+                        </defs>
+                        <Bar 
+                          dataKey="value" 
+                          name="Nilai Stok" 
+                          fill="url(#barGradient)" 
+                          radius={[4, 4, 0, 0]}
+                          barSize={40}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ClientOnlyRecharts>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-gray-500">
                     Tidak ada data cabang untuk ditampilkan

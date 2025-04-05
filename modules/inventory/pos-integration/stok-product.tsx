@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaBoxes, FaSearch, FaSort, FaSortUp, FaSortDown, 
   FaFileExport, FaArrowDown, FaArrowUp, FaDownload
@@ -32,10 +32,11 @@ import { Input } from '@/components/ui/input';
 import { formatRupiah } from '@/lib/utils';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import dynamic from 'next/dynamic';
-
-// Import dinamis untuk chart.js
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Data sampel pergerakan stok
 const sampleStockMovements = [
@@ -242,15 +243,21 @@ const StokProduct: React.FC<StokProductProps> = ({
   endDate,
   filterCabang
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  // State untuk filter dan sorting
+  const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterMovementType, setFilterMovementType] = useState<'all' | 'in' | 'out'>('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [movementTypeFilter, setMovementTypeFilter] = useState('all');
+  const [isMounted, setIsMounted] = useState(false);
   
-  const itemsPerPage = 10;
-  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Filter pergerakan stok
   const filteredMovements = sampleStockMovements.filter(movement => {
     // Filter berdasarkan cabang
@@ -267,20 +274,25 @@ const StokProduct: React.FC<StokProductProps> = ({
     }
     
     // Filter berdasarkan tipe pergerakan
-    if (filterMovementType !== 'all' && movement.movementType !== filterMovementType) {
+    if (movementTypeFilter !== 'all' && movement.movementType !== movementTypeFilter) {
       return false;
     }
     
     // Filter berdasarkan kategori
-    if (filterCategory !== 'all' && movement.category !== filterCategory) {
+    if (categoryFilter !== 'all' && movement.category !== categoryFilter) {
+      return false;
+    }
+    
+    // Filter berdasarkan sumber
+    if (sourceFilter !== 'all' && movement.source !== sourceFilter) {
       return false;
     }
     
     // Filter berdasarkan pencarian
     if (
-      searchQuery && 
-      !movement.productName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !movement.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      searchTerm && 
+      !movement.productName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !movement.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase())
     ) {
       return false;
     }
@@ -366,71 +378,20 @@ const StokProduct: React.FC<StokProductProps> = ({
   const totalMovements = filteredMovements.length;
   const uniqueProducts = new Set(filteredMovements.map(m => m.productId)).size;
   
-  // Opsi chart untuk ringkasan kategori
-  const categoryChartOptions = {
-    chart: {
-      type: 'bar' as const,
-      toolbar: {
-        show: false
-      },
-      fontFamily: 'Inter, sans-serif',
-    },
-    colors: ['#4CAF50', '#FF9800'],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        columnWidth: '70%',
-        borderRadius: 4,
-        dataLabels: {
-          position: 'top'
-        }
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    stroke: {
-      show: true,
-      width: 1,
-      colors: ['#fff']
-    },
-    xaxis: {
-      categories: stockMovementByCategory.map(item => item.category),
-      labels: {
-        formatter: (value: number) => `${Math.round(value/1000000)} jt`
-      }
-    },
-    yaxis: {
-      title: {
-        text: 'Kategori'
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: (value: number) => formatRupiah(value)
-      }
-    },
-    legend: {
-      position: 'top' as const
-    }
+  // Format data for Recharts
+  const formatCategoryData = () => {
+    return stockMovementByCategory.map(item => ({
+      category: item.category,
+      Masuk: item.in,
+      Keluar: item.out
+    }));
   };
-  
-  // Series chart untuk kategori
-  const categorySeries = [
-    {
-      name: 'Masuk',
-      data: stockMovementByCategory.map(item => item.in)
-    },
-    {
-      name: 'Keluar',
-      data: stockMovementByCategory.map(item => item.out)
-    }
-  ];
-  
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <FaBoxes className="text-orange-500" size={16} />
@@ -445,7 +406,8 @@ const StokProduct: React.FC<StokProductProps> = ({
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <FaArrowUp className="text-green-500" size={16} />
@@ -460,7 +422,8 @@ const StokProduct: React.FC<StokProductProps> = ({
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <FaArrowDown className="text-orange-500" size={16} />
@@ -475,7 +438,8 @@ const StokProduct: React.FC<StokProductProps> = ({
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <FaBoxes className="text-blue-500" size={16} />
@@ -491,7 +455,8 @@ const StokProduct: React.FC<StokProductProps> = ({
         </Card>
       </div>
       
-      <Card>
+      <Card className="shadow-md border-orange-100 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -499,22 +464,61 @@ const StokProduct: React.FC<StokProductProps> = ({
               <span>Pergerakan Stok per Kategori</span>
             </div>
             <Button variant="outline" size="sm">
-              <FaDownload className="mr-2 h-4 w-4" />
-              <span>Export</span>
+              <FaDownload className="mr-2 h-3 w-3" />
+              Unduh Data
             </Button>
           </CardTitle>
-          <CardDescription>
-            Nilai pergerakan masuk dan keluar per kategori produk
-          </CardDescription>
         </CardHeader>
-        <CardContent>
-          {typeof window !== 'undefined' && (
-            <Chart
-              options={categoryChartOptions}
-              series={categorySeries}
-              type="bar"
-              height={320}
-            />
+        <CardContent className="px-0 pt-4">
+          {isMounted && (
+            <ClientOnlyRecharts height={350}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={formatCategoryData()}
+                  margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis 
+                    type="number"
+                    tickFormatter={(value) => `${Math.round(value/1000000)} jt`}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#f1f5f9' }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    dataKey="category" 
+                    type="category"
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#f1f5f9' }}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [formatRupiah(value), '']}
+                    contentStyle={{
+                      fontSize: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                      border: 'none'
+                    }}
+                  />
+                  <Legend />
+                  <Bar 
+                    dataKey="Masuk" 
+                    fill="#4CAF50" 
+                    radius={[4, 4, 4, 4]}
+                    barSize={25}
+                  />
+                  <Bar 
+                    dataKey="Keluar" 
+                    fill="#f97316" 
+                    radius={[4, 4, 4, 4]}
+                    barSize={25}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ClientOnlyRecharts>
           )}
         </CardContent>
       </Card>
@@ -542,34 +546,34 @@ const StokProduct: React.FC<StokProductProps> = ({
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
                 placeholder="Cari produk atau nomor referensi..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full max-w-sm"
                 icon={<FaSearch className="text-gray-400" />}
               />
               
               <div className="flex gap-2">
                 <Button 
-                  variant={filterMovementType === 'all' ? 'default' : 'outline'} 
+                  variant={movementTypeFilter === 'all' ? 'default' : 'outline'} 
                   size="sm"
-                  onClick={() => setFilterMovementType('all')}
+                  onClick={() => setMovementTypeFilter('all')}
                   className="h-10"
                 >
                   Semua
                 </Button>
                 <Button 
-                  variant={filterMovementType === 'in' ? 'default' : 'outline'} 
+                  variant={movementTypeFilter === 'in' ? 'default' : 'outline'} 
                   size="sm"
-                  onClick={() => setFilterMovementType('in')}
+                  onClick={() => setMovementTypeFilter('in')}
                   className="h-10"
                 >
                   <FaArrowUp className="mr-2 h-3 w-3 text-green-500" />
                   Masuk
                 </Button>
                 <Button 
-                  variant={filterMovementType === 'out' ? 'default' : 'outline'} 
+                  variant={movementTypeFilter === 'out' ? 'default' : 'outline'} 
                   size="sm"
-                  onClick={() => setFilterMovementType('out')}
+                  onClick={() => setMovementTypeFilter('out')}
                   className="h-10"
                 >
                   <FaArrowDown className="mr-2 h-3 w-3 text-orange-500" />

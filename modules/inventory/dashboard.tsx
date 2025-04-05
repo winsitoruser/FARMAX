@@ -37,6 +37,7 @@ import { Progress } from '@/components/ui/progress';
 import { mockProducts, mockStocks } from './types';
 import { formatRupiah } from '@/lib/utils';
 import { LineChart, BarChart, DonutChart } from '@tremor/react';
+import ClientOnlyTremor from '@/components/charts/client-only-tremor';
 
 // Simulated data - would come from API in real implementation
 const branches = [
@@ -392,43 +393,51 @@ const InventoryDashboard: React.FC = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Charts Section */}
-        <Card className="lg:col-span-2">
+        <Card className="border-orange-200 overflow-hidden relative lg:col-span-2">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader>
             <CardTitle>Penjualan per Cabang</CardTitle>
             <CardDescription>Analisis penjualan untuk periode {timeRange === 'week' ? 'mingguan' : timeRange === 'month' ? 'bulanan' : 'tahunan'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <LineChart
-              data={salesData}
-              index="date"
-              categories={["Apotek Pusat", "Cabang Bandung", "Cabang Surabaya", "Cabang Medan"]}
-              colors={["blue", "green", "orange", "purple"]}
-              valueFormatter={(value: number) => `Rp ${(value / 1000000).toFixed(1)} juta`}
-              className="h-72"
-            />
+            <ClientOnlyTremor className="h-72">
+              <LineChart
+                data={salesData}
+                index="date"
+                categories={["Apotek Pusat", "Cabang Bandung", "Cabang Surabaya", "Cabang Medan"]}
+                colors={["#f97316", "#fb923c", "#fdba74", "#fed7aa"]}
+                valueFormatter={(value: number) => `Rp ${(value / 1000000).toFixed(1)} juta`}
+                className="h-72"
+              />
+            </ClientOnlyTremor>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="border-orange-200 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader>
             <CardTitle>Distribusi Stok</CardTitle>
             <CardDescription>Persentase stok di setiap cabang</CardDescription>
           </CardHeader>
           <CardContent>
-            <DonutChart
-              data={stockDistribution}
-              category="value"
-              index="branch"
-              colors={["blue", "green", "orange", "purple"]}
-              valueFormatter={(value: number) => `${value}%`}
-              className="h-60"
-            />
+            <ClientOnlyTremor className="h-60">
+              <DonutChart
+                data={stockDistribution}
+                category="value"
+                index="branch"
+                colors={["#f97316", "#fb923c", "#fdba74", "#fed7aa"]}
+                valueFormatter={(value: number) => `${value}%`}
+                className="h-60"
+              />
+            </ClientOnlyTremor>
             <div className="mt-4">
               <div className="text-sm font-medium">Distribusi Kategori Produk</div>
               <div className="space-y-2 mt-2">
-                {stockCategories.map((item) => (
+                {stockCategories.map((item, index) => (
                   <div key={item.category} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <div className="w-3 h-3 rounded-full" style={{
+                      backgroundColor: ["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"][index % 5]
+                    }}></div>
                     <div className="text-sm flex-1">{item.category}</div>
                     <div className="text-sm font-medium">{item.value}%</div>
                   </div>

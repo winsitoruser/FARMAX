@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaSearch, FaCalendarAlt, FaFileExport, FaFilter, FaChartBar, FaChartPie, FaArrowRight } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,14 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { formatRupiah } from '@/lib/formatter';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import dynamic from 'next/dynamic';
-import { useEffect, useState as useClientState } from 'react';
-
-// Client-side only chart component to avoid hydration errors
-const Chart = dynamic(() => import('react-apexcharts'), { 
-  ssr: false,
-  loading: () => <div className="h-64 w-full flex items-center justify-center">Loading chart...</div>
-});
+import { 
+  AreaChart, Area, LineChart, Line, PieChart, Pie, 
+  Cell, CartesianGrid, XAxis, YAxis, Tooltip, Legend, 
+  ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Fallback component for chart when client-side rendering is not available
 const ChartFallback = ({ title, icon }: { title: string, icon: React.ReactNode }) => (
@@ -113,6 +111,18 @@ const salesTrend = {
   categories: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 };
 
+// Format sales trend data for Recharts
+const formattedSalesTrend = salesTrend.categories.map((category, index) => ({
+  name: category,
+  penjualan: salesTrend.series[0].data[index]
+}));
+
+// Format top products data for Recharts
+const formattedTopProducts = topProducts.labels.map((label, index) => ({
+  name: label,
+  value: topProducts.series[index]
+}));
+
 const SalesModule = () => {
   const [isClient, setIsClient] = useState(false);
   
@@ -121,56 +131,13 @@ const SalesModule = () => {
     setIsClient(true);
   }, []);
   
-  // Chart options
-  const pieChartOptions = {
-    labels: topProducts.labels,
-    legend: {
-      position: 'bottom' as const,
-      fontSize: '12px',
-      fontFamily: 'Inter, sans-serif'
-    },
-    colors: ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7'],
-    dataLabels: {
-      enabled: false
-    },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: '55%'
-        }
-      }
-    }
-  };
-  
-  const lineChartOptions = {
-    chart: {
-      toolbar: {
-        show: false
-      }
-    },
-    xaxis: {
-      categories: salesTrend.categories
-    },
-    colors: ['#f97316'],
-    stroke: {
-      curve: 'smooth' as const,
-      width: 3
-    },
-    markers: {
-      size: 5,
-      colors: ['#f97316'],
-      strokeColors: '#fff',
-      strokeWidth: 2
-    },
-    grid: {
-      borderColor: '#f1f1f1'
-    }
-  };
-  
   // Handle transaction click
   const handleTransactionClick = (transaction: any) => {
     console.log('Transaction clicked:', transaction);
   };
+  
+  // Colors for the orange theme
+  const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7'];
   
   return (
     <div className="space-y-8">
@@ -299,19 +266,57 @@ const SalesModule = () => {
                 <h2 className="text-xl font-semibold text-gray-800 mb-1">Tren Penjualan</h2>
                 <p className="text-sm text-gray-500">Minggu Ini</p>
               </div>
-              <FaChartBar className="text-orange-500 text-xl" />
+              <div className="h-10 w-10 rounded-full bg-orange-200 flex items-center justify-center">
+                <FaChartBar className="text-orange-500 text-xl" />
+              </div>
             </div>
           </div>
           <div className="p-4">
             {!isClient ? (
               <ChartFallback title="Sales Trend" icon={<FaChartBar className="text-orange-500" size={24} />} />
             ) : (
-              <Chart
-                options={lineChartOptions}
-                series={salesTrend.series}
-                type="line"
-                height="350"
-              />
+              <ClientOnlyRecharts height={300}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={formattedSalesTrend}
+                    margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 12, fontFamily: 'Inter, sans-serif', fill: '#666' }}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => `${formatRupiah(value)}`}
+                      tick={{ fontSize: 12, fontFamily: 'Inter, sans-serif', fill: '#666' }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [`${formatRupiah(value)}`, 'Penjualan']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="penjualan" 
+                      name="Penjualan"
+                      stroke="#f97316" 
+                      fillOpacity={1} 
+                      fill="url(#colorSales)" 
+                      activeDot={{ r: 6 }}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
             )}
           </div>
         </div>
@@ -321,22 +326,56 @@ const SalesModule = () => {
           <div className="bg-orange-100 border-b border-orange-200 p-4">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-1">10 Produk Terlaris</h2>
-                <p className="text-sm text-gray-500">Bulan Maret 2025</p>
+                <h2 className="text-xl font-semibold text-gray-800 mb-1">Top 10 Produk</h2>
+                <p className="text-sm text-gray-500">Berdasarkan Penjualan</p>
               </div>
-              <FaChartPie className="text-orange-500 text-xl" />
+              <div className="h-10 w-10 rounded-full bg-orange-200 flex items-center justify-center">
+                <FaChartPie className="text-orange-500 text-xl" />
+              </div>
             </div>
           </div>
-          <div className="p-4 flex items-center justify-center h-[calc(100%-4rem)]">
+          <div className="p-4">
             {!isClient ? (
               <ChartFallback title="Top 10 Products" icon={<FaChartPie className="text-orange-500" size={24} />} />
             ) : (
-              <Chart
-                options={pieChartOptions}
-                series={topProducts.series}
-                type="pie"
-                height="350"
-              />
+              <ClientOnlyRecharts height={300}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={formattedTopProducts}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      labelLine={false}
+                      label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {formattedTopProducts.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend 
+                      layout="vertical" 
+                      verticalAlign="middle" 
+                      align="right"
+                      wrapperStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [`${value}`, 'Jumlah']}
+                      contentStyle={{
+                        fontSize: '12px',
+                        fontFamily: 'Inter, sans-serif',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ClientOnlyRecharts>
             )}
           </div>
         </div>

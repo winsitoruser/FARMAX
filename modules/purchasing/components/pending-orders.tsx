@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
+import { format } from 'date-fns'
 import { 
   Card, CardContent, CardDescription, CardHeader, CardTitle 
 } from '@/components/ui/card'
 import { 
-  Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow 
+  Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, TableFooter 
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,10 +15,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from '@/components/ui/select'
 import { 
-  FaSearch, FaEye, FaEdit, FaCheck, FaTimes, FaFileInvoice, 
-  FaTruck, FaBoxOpen, FaExclamationTriangle, FaClock
+  FaSearch, FaCheck, FaTimes, FaEye, FaFileInvoice, FaEdit, 
+  FaClock, FaShippingFast, FaExclamationTriangle, FaShoppingCart, FaClipboardList
 } from 'react-icons/fa'
-import { toast } from '@/components/ui/use-toast'
+import { useToast } from '@/components/ui/use-toast'
 
 // Mock data for pending purchase orders
 const mockPendingOrders = [
@@ -103,6 +104,7 @@ export function PendingOrders() {
   const [activeTab, setActiveTab] = useState<string>("details");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { toast } = useToast();
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -116,6 +118,16 @@ export function PendingOrders() {
       setSelectedOrder(order);
       setOrderDetailOpen(true);
       setActiveTab("details");
+    }
+  };
+  
+  // Handle view invoice
+  const handleViewInvoice = (orderId: string) => {
+    const order = mockPendingOrders.find(order => order.id === orderId);
+    if (order) {
+      setSelectedOrder(order);
+      setOrderDetailOpen(true);
+      setActiveTab("invoice");
     }
   };
 
@@ -168,7 +180,7 @@ export function PendingOrders() {
           label: "Menunggu Persetujuan", 
           variant: "outline" as const,
           icon: <FaClock className="mr-1 h-3 w-3" />,
-          className: "border-orange-200 text-orange-700 bg-orange-50"
+          className: "border-red-200 text-red-700 bg-red-50"
         };
       case "approved":
         return { 
@@ -181,14 +193,14 @@ export function PendingOrders() {
         return { 
           label: "Dalam Pengiriman", 
           variant: "outline" as const,
-          icon: <FaTruck className="mr-1 h-3 w-3" />,
+          icon: <FaShippingFast className="mr-1 h-3 w-3" />,
           className: "border-blue-200 text-blue-700 bg-blue-50"
         };
       case "partial_delivery":
         return { 
           label: "Pengiriman Sebagian", 
           variant: "outline" as const,
-          icon: <FaBoxOpen className="mr-1 h-3 w-3" />,
+          icon: <FaShoppingCart className="mr-1 h-3 w-3" />,
           className: "border-purple-200 text-purple-700 bg-purple-50"
         };
       case "rejected":
@@ -209,243 +221,260 @@ export function PendingOrders() {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="relative overflow-hidden">
-        {/* Decorative header element */}
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-orange-500 to-amber-400"></div>
+    <div className="p-4">
+      <Card className="border-red-100 shadow-lg bg-white/70 backdrop-blur-sm overflow-hidden relative">
+        {/* Design elements */}
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-700 via-red-600 to-red-500"></div>
+        <div className="absolute top-0 right-0 h-40 w-40 bg-gradient-to-bl from-red-500/10 to-red-300/5 rounded-full blur-xl -z-0"></div>
+        <div className="absolute bottom-0 left-0 h-32 w-32 bg-gradient-to-tr from-red-500/10 to-orange-400/5 rounded-full blur-xl -z-0"></div>
         
-        {/* Decorative blurred circles */}
-        <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-orange-500/20 blur-xl"></div>
-        <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-amber-500/20 blur-xl"></div>
-        
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center">
-            <FaClock className="mr-2 h-6 w-6 text-orange-500" />
+        <CardHeader className="pb-2 border-b border-red-100/50 relative z-10">
+          <CardTitle className="text-xl font-bold bg-gradient-to-r from-red-700 to-red-500 text-transparent bg-clip-text flex items-center gap-2">
+            <span className="inline-block p-1.5 rounded-full bg-gradient-to-br from-red-600 to-red-500">
+              <FaShoppingCart className="h-4 w-4 text-white" />
+            </span>
             Pesanan Tertunda
           </CardTitle>
           <CardDescription>
-            Kelola pesanan yang sedang menunggu persetujuan atau pengiriman
+            Daftar pesanan yang belum diproses dan diterima oleh apotek
           </CardDescription>
         </CardHeader>
         
-        <CardContent>
-          <div className="space-y-6">
-            {/* Filter and search */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Input 
-                  placeholder="Cari berdasarkan nomor PO atau supplier" 
-                  className="pl-10" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              </div>
-              <div className="flex gap-2">
-                <Select defaultValue="all" onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Status</SelectItem>
-                    <SelectItem value="awaiting_approval">Menunggu Persetujuan</SelectItem>
-                    <SelectItem value="approved">Disetujui</SelectItem>
-                    <SelectItem value="shipped">Dalam Pengiriman</SelectItem>
-                    <SelectItem value="partial_delivery">Pengiriman Sebagian</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            {/* List of pending orders */}
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>No. PO</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-center">Jumlah Item</TableHead>
-                    <TableHead className="text-right">Nilai Total</TableHead>
-                    <TableHead>Est. Pengiriman</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-4 text-muted-foreground">
-                        Tidak ada pesanan yang ditemukan
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => {
-                      const statusBadge = getStatusBadge(order.status);
-                      
-                      return (
-                        <TableRow key={order.id} className="border-b border-gray-200 hover:bg-gray-50">
-                          <TableCell className="font-medium">{new Date(order.date).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}</TableCell>
-                          <TableCell>{order.poNumber}</TableCell>
-                          <TableCell>{order.supplier.name}</TableCell>
-                          <TableCell className="text-center">{order.totalItems}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(order.totalValue)}</TableCell>
-                          <TableCell>{new Date(order.expectedDelivery).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={statusBadge.variant} className={statusBadge.className}>
-                              {statusBadge.icon}
-                              {statusBadge.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center space-x-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
-                                onClick={() => handleViewOrder(order.id)}
-                                title="Lihat Detail"
-                              >
-                                <FaEye className="h-4 w-4" />
-                              </Button>
-                              
-                              {order.status === "awaiting_approval" && (
-                                <>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    className="text-green-500 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
-                                    onClick={() => handleApproveOrder(order.id)}
-                                    title="Setujui"
-                                  >
-                                    <FaCheck className="h-4 w-4" />
-                                  </Button>
-                                  
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                                    onClick={() => handleRejectOrder(order.id)}
-                                    title="Tolak"
-                                  >
-                                    <FaTimes className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              )}
-                              
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 h-8 w-8 p-0"
-                                onClick={() => handleEditOrder(order.id)}
-                                title="Edit"
-                              >
-                                <FaEdit className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+        {/* Search and Filter */}
+        <div className="p-4 flex flex-col md:flex-row gap-2 justify-between">
+          <div className="relative flex items-center w-full md:w-64">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input 
+              placeholder="Cari nomor PO atau supplier..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 border-red-100 focus:border-red-300 focus:ring-red-200"
+            />
           </div>
+          
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full md:w-48 border-red-100 focus:border-red-300 focus:ring-red-200">
+              <SelectValue placeholder="Filter status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Status</SelectItem>
+              <SelectItem value="awaiting_approval">Menunggu Persetujuan</SelectItem>
+              <SelectItem value="approved">Disetujui</SelectItem>
+              <SelectItem value="shipped">Dalam Pengiriman</SelectItem>
+              <SelectItem value="partial_delivery">Pengiriman Sebagian</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <CardContent className="p-0 relative z-10">
+          <Table>
+            <TableHeader className="bg-gradient-to-r from-red-50 to-red-100/70">
+              <TableRow>
+                <TableHead>Nomor PO</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Staff</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    Tidak ada pesanan ditemukan
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredOrders.map((order) => (
+                  <TableRow key={order.id} className="hover:bg-red-50/50 transition-colors">
+                    <TableCell className="font-medium">{order.poNumber}</TableCell>
+                    <TableCell>{new Date(order.date).toLocaleDateString('id-ID')}</TableCell>
+                    <TableCell>{order.supplier.name}</TableCell>
+                    <TableCell>Admin Farmasi</TableCell>
+                    <TableCell className="text-right">{formatCurrency(order.totalValue)}</TableCell>
+                    <TableCell>
+                      <Badge className={getStatusBadge(order.status).className} variant="outline">
+                        {getStatusBadge(order.status).icon}
+                        {getStatusBadge(order.status).label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 px-2 border-red-200 hover:bg-red-100 hover:text-red-700"
+                          onClick={() => handleViewOrder(order.id)}
+                        >
+                          <FaEye className="h-3.5 w-3.5 mr-1" />
+                          List Produk
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 w-8 p-0 border-red-200 hover:bg-red-100 hover:text-red-700"
+                          onClick={() => handleViewInvoice(order.id)}
+                        >
+                          <FaFileInvoice className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+            <TableFooter className="bg-gradient-to-r from-red-100/30 to-red-50/50">
+              <TableRow>
+                <TableCell colSpan={7} className="text-right font-medium text-red-800">
+                  Total: {filteredOrders.length} pesanan tertunda
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
         </CardContent>
       </Card>
-      
-      {/* Order Detail Dialog */}
+
+      {/* Dialog for viewing order details */}
       <Dialog open={orderDetailOpen} onOpenChange={setOrderDetailOpen}>
-        <DialogContent className="max-w-4xl overflow-hidden">
-          {/* Decorative header element */}
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-orange-500 to-amber-400"></div>
-          
-          {/* Decorative blurred circles */}
-          <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-orange-500/20 blur-xl"></div>
-          <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-amber-500/20 blur-xl"></div>
-          
-          <DialogHeader>
-            <DialogTitle className="text-2xl flex items-center">
-              <FaFileInvoice className="mr-2 h-6 w-6 text-orange-500" />
-              Detail Pesanan: {selectedOrder?.poNumber}
-            </DialogTitle>
-            <DialogDescription>
-              Informasi lengkap tentang pesanan
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto bg-gradient-to-br from-white to-red-50/20">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-700 via-red-600 to-red-500"></div>
+          <div className="absolute top-0 right-0 h-40 w-40 bg-gradient-to-bl from-red-500/10 to-red-300/5 rounded-full blur-xl -z-0"></div>
           
           {selectedOrder && (
-            <div className="py-4">
-              <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="details" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white">
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-red-700 to-red-500 text-transparent bg-clip-text flex items-center gap-2">
+                  <span className="inline-block p-1 rounded-full bg-gradient-to-br from-red-600 to-red-500">
+                    <FaClipboardList className="h-4 w-4 text-white" />
+                  </span>
+                  Detail Pesanan {selectedOrder.poNumber}
+                </DialogTitle>
+                <DialogDescription>
+                  Informasi lengkap tentang pesanan ini
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="w-full bg-red-50/80 p-1 gap-1">
+                  <TabsTrigger 
+                    value="details"
+                    className="text-red-800 hover:bg-red-100/70
+                    data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-700 data-[state=active]:to-red-500 
+                    data-[state=active]:text-white data-[state=active]:font-medium
+                    data-[state=active]:shadow-sm data-[state=active]:shadow-red-500/20
+                    rounded-md px-4 py-2"
+                  >
                     Detail Pesanan
                   </TabsTrigger>
-                  <TabsTrigger value="items" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white">
+                  <TabsTrigger 
+                    value="products"
+                    className="text-red-800 hover:bg-red-100/70
+                    data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-700 data-[state=active]:to-red-500 
+                    data-[state=active]:text-white data-[state=active]:font-medium
+                    data-[state=active]:shadow-sm data-[state=active]:shadow-red-500/20
+                    rounded-md px-4 py-2"
+                  >
                     Daftar Produk
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="invoice"
+                    className="text-red-800 hover:bg-red-100/70
+                    data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-700 data-[state=active]:to-red-500 
+                    data-[state=active]:text-white data-[state=active]:font-medium
+                    data-[state=active]:shadow-sm data-[state=active]:shadow-red-500/20
+                    rounded-md px-4 py-2"
+                  >
+                    Format Invoice
                   </TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="details" className="mt-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                <TabsContent value="details" className="pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-red-50/50 rounded-md">
+                    <div>
                       <p className="text-sm text-gray-500">Nomor PO</p>
                       <p className="font-medium">{selectedOrder.poNumber}</p>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-500">Tanggal Pesanan</p>
-                      <p className="font-medium">{new Date(selectedOrder.date).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}</p>
+                    <div>
+                      <p className="text-sm text-gray-500">Tanggal</p>
+                      <p className="font-medium">{new Date(selectedOrder.date).toLocaleDateString('id-ID')}</p>
                     </div>
-                    
-                    <div className="space-y-2">
+                    <div>
                       <p className="text-sm text-gray-500">Supplier</p>
                       <p className="font-medium">{selectedOrder.supplier.name}</p>
                     </div>
-                    
-                    <div className="space-y-2">
+                    <div>
+                      <p className="text-sm text-gray-500">Estimasi Pengiriman</p>
+                      <p className="font-medium">{new Date(selectedOrder.expectedDelivery).toLocaleDateString('id-ID')}</p>
+                    </div>
+                    <div>
                       <p className="text-sm text-gray-500">Status</p>
-                      <Badge variant={getStatusBadge(selectedOrder.status).variant} className={getStatusBadge(selectedOrder.status).className}>
+                      <Badge className={getStatusBadge(selectedOrder.status).className} variant="outline">
                         {getStatusBadge(selectedOrder.status).icon}
                         {getStatusBadge(selectedOrder.status).label}
                       </Badge>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-500">Estimasi Pengiriman</p>
-                      <p className="font-medium">{new Date(selectedOrder.expectedDelivery).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}</p>
-                    </div>
-                    
-                    <div className="space-y-2">
+                    <div>
                       <p className="text-sm text-gray-500">Total Nilai</p>
-                      <p className="font-medium text-lg">{formatCurrency(selectedOrder.totalValue)}</p>
+                      <p className="font-medium">{formatCurrency(selectedOrder.totalValue)}</p>
                     </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2 mt-4">
+                    {selectedOrder.status === 'awaiting_approval' && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          className="border-red-200 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => {
+                            handleRejectOrder(selectedOrder.id);
+                            setOrderDetailOpen(false);
+                          }}
+                        >
+                          <FaTimes className="mr-2 h-4 w-4" /> Tolak
+                        </Button>
+                        <Button 
+                          className="bg-gradient-to-r from-red-700 to-red-500 hover:from-red-800 hover:to-red-600 text-white"
+                          onClick={() => {
+                            handleApproveOrder(selectedOrder.id);
+                            setOrderDetailOpen(false);
+                          }}
+                        >
+                          <FaCheck className="mr-2 h-4 w-4" /> Setujui
+                        </Button>
+                      </>
+                    )}
+                    {/* Hanya tampilkan tombol Edit jika status adalah awaiting_approval */}
+                    {selectedOrder.status === 'awaiting_approval' && (
+                      <Button 
+                        className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white"
+                        onClick={() => {
+                          handleEditOrder(selectedOrder.id);
+                          setOrderDetailOpen(false);
+                        }}
+                      >
+                        <FaEdit className="mr-2 h-4 w-4" /> Edit
+                      </Button>
+                    )}
+                    {/* Tampilkan tombol Tutup untuk status selain awaiting_approval */}
+                    {selectedOrder.status !== 'awaiting_approval' && (
+                      <Button 
+                        className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
+                        onClick={() => setOrderDetailOpen(false)}
+                      >
+                        Tutup
+                      </Button>
+                    )}
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="items" className="mt-6">
+                <TabsContent value="products" className="pt-4">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-gradient-to-r from-red-50 to-red-100/70">
                       <TableRow>
-                        <TableHead>Produk</TableHead>
-                        <TableHead className="text-center">Kuantitas</TableHead>
+                        <TableHead>Nama Produk</TableHead>
+                        <TableHead className="text-right">Jumlah</TableHead>
                         <TableHead className="text-right">Harga Satuan</TableHead>
                         <TableHead className="text-right">Subtotal</TableHead>
                       </TableRow>
@@ -453,64 +482,116 @@ export function PendingOrders() {
                     <TableBody>
                       {selectedOrder.items.map((item: any) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.product}</TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell>{item.product}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="border-t-2 border-gray-300">
-                        <TableCell colSpan={3} className="text-right font-bold">
-                          Total
-                        </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {formatCurrency(selectedOrder.totalValue)}
-                        </TableCell>
-                      </TableRow>
                     </TableBody>
+                    <TableFooter className="bg-gradient-to-r from-red-100/30 to-red-50/50">
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-right font-medium">Total:</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(selectedOrder.totalValue)}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </TabsContent>
+                
+                <TabsContent value="invoice" className="pt-4">
+                  <div className="border border-red-100 rounded-md p-6 bg-white relative">
+                    {/* Invoice header with logo and PO details */}
+                    <div className="flex justify-between mb-8">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">FARMAX APOTEK</h3>
+                        <p className="text-sm text-gray-500">Jl. Farmasi No. 123</p>
+                        <p className="text-sm text-gray-500">Jakarta, Indonesia</p>
+                      </div>
+                      <div className="text-right">
+                        <h4 className="text-xl font-bold bg-gradient-to-r from-red-700 to-red-500 text-transparent bg-clip-text">
+                          PURCHASE ORDER
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">Nomor: {selectedOrder.poNumber}</p>
+                        <p className="text-sm text-gray-500">Tanggal: {new Date(selectedOrder.date).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Supplier and delivery info */}
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2">Supplier:</h5>
+                        <p className="text-sm">{selectedOrder.supplier.name}</p>
+                        <p className="text-sm text-gray-500">ID: {selectedOrder.supplier.id}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-gray-700 mb-2">Informasi Pengiriman:</h5>
+                        <p className="text-sm">Estimasi Pengiriman: {new Date(selectedOrder.expectedDelivery).toLocaleDateString('id-ID')}</p>
+                        <p className="text-sm text-gray-500">Status: {getStatusBadge(selectedOrder.status).label}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Items table */}
+                    <h5 className="font-medium text-gray-700 mb-2">Daftar Item:</h5>
+                    <Table>
+                      <TableHeader className="bg-gradient-to-r from-red-50 to-red-100/70">
+                        <TableRow>
+                          <TableHead>Nama Produk</TableHead>
+                          <TableHead className="text-right">Jumlah</TableHead>
+                          <TableHead className="text-right">Harga Satuan</TableHead>
+                          <TableHead className="text-right">Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedOrder.items.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.product}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter className="bg-gradient-to-r from-red-100/30 to-red-50/50">
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-right font-medium">Total:</TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(selectedOrder.totalValue)}</TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                    
+                    {/* Signatures block */}
+                    <div className="grid grid-cols-2 gap-6 mt-8">
+                      <div className="text-center">
+                        <p className="mb-8">______________________</p>
+                        <p className="font-medium">Pemohon</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="mb-8">______________________</p>
+                        <p className="font-medium">Menyetujui</p>
+                      </div>
+                    </div>
+                    
+                    {/* Print button */}
+                    <div className="mt-6 flex justify-end">
+                      <Button 
+                        className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
+                        onClick={() => {
+                          toast({
+                            title: "Mencetak Invoice",
+                            description: `Invoice untuk pesanan ${selectedOrder.poNumber} sedang dicetak`,
+                          });
+                        }}
+                      >
+                        <FaFileInvoice className="mr-2 h-4 w-4" /> Cetak Invoice
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
-            </div>
+            </>
           )}
-          
-          <DialogFooter className="flex gap-2">
-            {selectedOrder?.status === "awaiting_approval" && (
-              <>
-                <Button 
-                  onClick={() => {
-                    handleRejectOrder(selectedOrder.id);
-                    setOrderDetailOpen(false);
-                  }}
-                  variant="outline"
-                  className="border-red-200 text-red-700 hover:bg-red-50"
-                >
-                  <FaTimes className="mr-2 h-4 w-4" />
-                  Tolak
-                </Button>
-                <Button 
-                  onClick={() => {
-                    handleApproveOrder(selectedOrder.id);
-                    setOrderDetailOpen(false);
-                  }}
-                  className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-                >
-                  <FaCheck className="mr-2 h-4 w-4" />
-                  Setujui
-                </Button>
-              </>
-            )}
-            {selectedOrder?.status !== "awaiting_approval" && (
-              <Button 
-                onClick={() => setOrderDetailOpen(false)}
-                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-              >
-                Tutup
-              </Button>
-            )}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

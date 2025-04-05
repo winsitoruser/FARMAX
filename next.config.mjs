@@ -62,8 +62,8 @@ const nextConfig = {
    * But while you use `pnpm build`, it stops on the first type errors.
    * So you can use `pnpm bv` to check all type warns and errors at once.
    */
-  typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: false },
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;

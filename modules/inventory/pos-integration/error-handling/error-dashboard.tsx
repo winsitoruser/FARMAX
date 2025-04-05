@@ -33,11 +33,12 @@ import {
   FaCheckCircle, FaTimes, FaFilter, FaPlus, FaBan
 } from 'react-icons/fa';
 
-import { errorManager } from '../services/error-service';
-import dynamic from 'next/dynamic';
-
-// Import dinamis untuk Chart 
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { POSErrorManager as errorManager } from '../services/error-service';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Interface untuk error log
 interface ErrorLog {
@@ -63,14 +64,16 @@ const ErrorDashboard: React.FC = () => {
     resolved: 0,
     critical: 0,
     retrySuccess: 0,
-    moduleBreakdown: {}
+    moduleBreakdown: {} as Record<string, number>
   });
+  const [isMounted, setIsMounted] = useState(false);
   
   // Mengambil data error dari API/service
   useEffect(() => {
     // Dalam produksi, ini akan mengambil data dari API
     // Gunakan errorManager untuk mendapatkan log error
     loadErrorLogs();
+    setIsMounted(true);
   }, [statusFilter, severityFilter, moduleFilter]);
   
   const loadErrorLogs = () => {
@@ -100,7 +103,7 @@ const ErrorDashboard: React.FC = () => {
       resolved: mockErrorLogs.filter(log => log.status === 'resolved').length,
       critical: mockErrorLogs.filter(log => log.severity === 'critical').length,
       retrySuccess: mockErrorLogs.filter(log => log.status === 'resolved' && log.retryCount > 0).length,
-      moduleBreakdown: {}
+      moduleBreakdown: {} as Record<string, number>
     };
     
     // Hitung breakdown berdasarkan modul
@@ -198,6 +201,17 @@ const ErrorDashboard: React.FC = () => {
   // Unique modules for filtering
   const modules = ['POS Integration', 'Stock Synchronization', 'Transaction Processing', 'Inventory Tracking'];
   
+  // Format data for Recharts
+  const formatModuleData = () => {
+    return Object.keys(statistics.moduleBreakdown).map(module => ({
+      name: module,
+      value: (statistics.moduleBreakdown as Record<string, number>)[module]
+    }));
+  };
+
+  // Colors for pie chart
+  const COLORS = ['#ff6b35', '#f7c59f', '#ffdc5e', '#5aa9e6'];
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="relative bg-gradient-to-r from-orange-500 to-amber-500 text-white">
@@ -454,37 +468,42 @@ const ErrorDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    {typeof window !== 'undefined' && (
-                      <Chart
-                        options={{
-                          chart: {
-                            type: 'pie',
-                            fontFamily: 'Inter, sans-serif'
-                          },
-                          labels: Object.keys(statistics.moduleBreakdown),
-                          colors: ['#ff6b35', '#f7c59f', '#ffdc5e', '#5aa9e6'],
-                          legend: {
-                            position: 'bottom'
-                          },
-                          dataLabels: {
-                            enabled: true
-                          },
-                          responsive: [{
-                            breakpoint: 480,
-                            options: {
-                              chart: {
-                                width: 250
-                              },
-                              legend: {
-                                position: 'bottom'
-                              }
-                            }
-                          }]
-                        }}
-                        series={Object.values(statistics.moduleBreakdown)}
-                        type="pie"
-                        height={300}
-                      />
+                    {isMounted && (
+                      <ClientOnlyRecharts height={300}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={formatModuleData()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={true}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={100}
+                              fill="#f97316"
+                              dataKey="value"
+                            >
+                              {formatModuleData().map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value) => [`${value} error`, '']}
+                              contentStyle={{
+                                fontSize: '12px',
+                                backgroundColor: 'white',
+                                borderRadius: '8px',
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                                border: 'none'
+                              }}
+                            />
+                            <Legend 
+                              layout="horizontal" 
+                              verticalAlign="bottom" 
+                              align="center" 
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </ClientOnlyRecharts>
                     )}
                   </div>
                 </CardContent>
@@ -496,68 +515,75 @@ const ErrorDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    {typeof window !== 'undefined' && (
-                      <Chart
-                        options={{
-                          chart: {
-                            type: 'bar',
-                            fontFamily: 'Inter, sans-serif',
-                            toolbar: {
-                              show: false
-                            }
-                          },
-                          plotOptions: {
-                            bar: {
-                              borderRadius: 4,
-                              columnWidth: '60%',
-                              colors: {
-                                ranges: [
-                                  {
-                                    from: 0,
-                                    to: 2,
-                                    color: '#4caf50'
-                                  },
-                                  {
-                                    from: 3,
-                                    to: 5,
-                                    color: '#ff9800'
-                                  },
-                                  {
-                                    from: 6,
-                                    to: 50,
-                                    color: '#f44336'
-                                  }
-                                ]
-                              }
-                            }
-                          },
-                          dataLabels: {
-                            enabled: false
-                          },
-                          xaxis: {
-                            categories: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
-                            labels: {
-                              style: {
-                                fontSize: '12px'
-                              }
-                            }
-                          },
-                          yaxis: {
-                            title: {
-                              text: 'Jumlah Error'
-                            }
-                          },
-                          colors: ['#ff6b35']
-                        }}
-                        series={[
-                          {
-                            name: 'Error',
-                            data: [4, 3, 5, 8, 2, 1, 3]
-                          }
-                        ]}
-                        type="bar"
-                        height={300}
-                      />
+                    {isMounted && (
+                      <ClientOnlyRecharts height={300}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={[
+                              { name: 'Sen', errors: 4 },
+                              { name: 'Sel', errors: 3 },
+                              { name: 'Rab', errors: 5 },
+                              { name: 'Kam', errors: 8 },
+                              { name: 'Jum', errors: 2 },
+                              { name: 'Sab', errors: 1 },
+                              { name: 'Min', errors: 3 }
+                            ]}
+                            margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis 
+                              dataKey="name"
+                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              axisLine={{ stroke: '#f1f5f9' }}
+                              tickLine={false}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              axisLine={{ stroke: '#f1f5f9' }}
+                              tickLine={false}
+                              label={{ 
+                                value: 'Jumlah Error', 
+                                angle: -90, 
+                                position: 'insideLeft',
+                                style: { fontSize: 12, fill: '#64748b', textAnchor: 'middle' } 
+                              }}
+                            />
+                            <Tooltip 
+                              formatter={(value) => [`${value} error`, 'Jumlah']}
+                              contentStyle={{
+                                fontSize: '12px',
+                                backgroundColor: 'white',
+                                borderRadius: '8px',
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                                border: 'none'
+                              }}
+                            />
+                            <Bar 
+                              dataKey="errors" 
+                              radius={[4, 4, 0, 0]}
+                              barSize={30}
+                            >
+                              {[
+                                { name: 'Sen', errors: 4 },
+                                { name: 'Sel', errors: 3 },
+                                { name: 'Rab', errors: 5 },
+                                { name: 'Kam', errors: 8 },
+                                { name: 'Jum', errors: 2 },
+                                { name: 'Sab', errors: 1 },
+                                { name: 'Min', errors: 3 }
+                              ].map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={
+                                    entry.errors <= 2 ? '#4caf50' : 
+                                    entry.errors <= 5 ? '#ff9800' : '#f44336'
+                                  } 
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ClientOnlyRecharts>
                     )}
                   </div>
                 </CardContent>

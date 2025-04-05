@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Footer from '@/components/shared/footer';
 import { FaChevronLeft, FaChevronRight, FaBars } from 'react-icons/fa';
 import Link from 'next/link';
-import EnhancedHeader from './enhanced-header';
+import PosNavbar from '@/components/pos/pos-navbar';
 
 interface PosLayoutProps {
   children: React.ReactNode;
@@ -44,7 +44,7 @@ const PosLayout = ({ children }: PosLayoutProps) => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
       <div
         className={`bg-white border-r border-gray-200 transition-all duration-300 ease-in-out h-screen fixed top-0 left-0 z-40 ${
@@ -126,16 +126,27 @@ const PosLayout = ({ children }: PosLayoutProps) => {
       
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-        {/* Unified header component handles visibility internally */}
-        <EnhancedHeader toggleSidebar={toggleSidebar} isCompact={sidebarCollapsed} />
+        {/* Header */}
+        <div className="fixed top-0 right-0 left-0 z-50 bg-white shadow-sm">
+          <div className="h-1.5 w-full bg-gradient-to-r from-orange-600 to-amber-500"></div>
+          <PosNavbar 
+            scrolled={scrolled} 
+            sidebarCollapsed={sidebarCollapsed} 
+            toggleSidebar={toggleSidebar}
+            showBilling={true}
+            showBusinessSettings={true}
+          />
+        </div>
         
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto">
-          {children}
+        <main className="flex-1 overflow-auto pt-16">
+          <div className="container mx-auto py-4 px-4">
+            {children}
+          </div>
         </main>
         
         {/* Footer */}
-        <Footer themeColor="gray" />
+        <Footer />
       </div>
       
       {/* Drawer background overlay - will be visible when drawer is open */}

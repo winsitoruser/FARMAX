@@ -12,6 +12,7 @@ import {
   FaHome,
   FaTachometerAlt
 } from 'react-icons/fa';
+import FarmaxHeader from '@/components/common/farmax-header';
 
 interface PurchasingPageLayoutProps {
   children: ReactNode;
@@ -49,28 +50,11 @@ const PurchasingPageLayout: React.FC<PurchasingPageLayoutProps> = ({
         <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#f97316_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
       </div>
 
-      {/* Header */}
-      <div className="bg-white border-b border-orange-100 sticky top-0 z-20 shadow-sm relative">
-        <div className="relative h-2 w-full bg-gradient-to-r from-red-500 to-amber-500"></div>
-        
-        {/* Pill decoration at top */}
-        <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full px-8 w-32"></div>
-        <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full px-6 w-24 opacity-60"></div>
-        
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center text-sm text-gray-600 hover:text-red-600 transition-colors">
-            <FaArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            <span>Kembali ke Dashboard</span>
-          </Link>
-          
-          <div className="text-lg font-bold bg-gradient-to-r from-red-600 to-orange-500 text-transparent bg-clip-text">Manajemen Pembelian</div>
-          
-          <div className="w-28">
-            {/* Placeholder to balance the header */}
-          </div>
-        </div>
-        
-        {/* Navigation */}
+      {/* FARMAX Header */}
+      <FarmaxHeader />
+      
+      {/* Navigation */}
+      <div className="bg-white border-b border-orange-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-1">
           <div className="flex space-x-1 overflow-x-auto pb-1.5 scrollbar-hide">
             {navItems.map((item) => {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,12 +10,12 @@ import ClientOnly from '@/components/common/client-only';
 import { formatRupiah } from '@/lib/formatter';
 import BackButton from '@/components/common/back-button';
 import SimpleHeader from '@/components/shared/simple-header';
-
-// Dynamic import for Chart component
-const Chart = dynamic(() => import('react-apexcharts'), { 
-  ssr: false,
-  loading: () => <div className="h-64 w-full flex items-center justify-center">Loading chart...</div>
-});
+import { 
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, CartesianGrid, XAxis, YAxis, 
+  Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 
 // Interface for transaction data
 interface Transaction {
@@ -36,6 +35,11 @@ const PenjualanPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Sample data for the chart
   const chartData = {
@@ -61,6 +65,17 @@ const PenjualanPage = () => {
       }],
       categories: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
     }
+  };
+
+  // Format chart data for Recharts
+  const formatChartData = () => {
+    const categories = chartData[period as keyof typeof chartData].categories;
+    const series = chartData[period as keyof typeof chartData].series[0].data;
+    
+    return categories.map((category, index) => ({
+      name: category,
+      penjualan: series[index]
+    }));
   };
 
   // Sample transaction data
@@ -160,109 +175,6 @@ const PenjualanPage = () => {
     return <FaSort className="ml-1 text-gray-400" size={14} />;
   };
 
-  // Chart options
-  const chartOptions = {
-    chart: {
-      type: 'area',
-      height: 350,
-      toolbar: {
-        show: false
-      },
-      fontFamily: 'Inter, sans-serif',
-    },
-    dataLabels: {
-      enabled: false
-    },
-    stroke: {
-      curve: 'smooth',
-      width: 2
-    },
-    xaxis: {
-      categories: chartData[period as keyof typeof chartData].categories,
-      labels: {
-        style: {
-          colors: '#64748b',
-          fontSize: '12px',
-        }
-      },
-      axisBorder: {
-        show: false
-      },
-      axisTicks: {
-        show: false
-      }
-    },
-    yaxis: {
-      labels: {
-        formatter: function(value: number) {
-          return formatRupiah(value);
-        },
-        style: {
-          colors: '#64748b',
-          fontSize: '12px',
-        }
-      }
-    },
-    colors: ['#f97316'],
-    fill: {
-      type: 'gradient',
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.6,
-        opacityTo: 0.1,
-        stops: [0, 90, 100],
-        colorStops: [
-          {
-            offset: 0,
-            color: '#f97316',
-            opacity: 0.6
-          },
-          {
-            offset: 100,
-            color: '#fdba74',
-            opacity: 0.1
-          }
-        ]
-      }
-    },
-    tooltip: {
-      y: {
-        formatter: function(value: number) {
-          return formatRupiah(value);
-        }
-      }
-    },
-    grid: {
-      borderColor: '#f1f5f9',
-      strokeDashArray: 4,
-      xaxis: {
-        lines: {
-          show: true
-        }
-      },
-      yaxis: {
-        lines: {
-          show: true
-        }
-      },
-      padding: {
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 10
-      }
-    },
-    markers: {
-      size: 4,
-      colors: ['#f97316'],
-      strokeColors: '#ffffff',
-      strokeWidth: 2,
-      hover: {
-        size: 6
-      }
-    }
-  };
-
   // Filter states for product table
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
@@ -359,7 +271,8 @@ const PenjualanPage = () => {
       {/* Sales Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* YTD Comparison */}
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-bold">Year to Date (YTD)</CardTitle>
             <CardDescription>Perbandingan penjualan tahun ini dengan tahun lalu</CardDescription>
@@ -389,7 +302,8 @@ const PenjualanPage = () => {
         </Card>
 
         {/* MTD Comparison */}
-        <Card>
+        <Card className="shadow-md border-orange-100 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-bold">Month to Date (MTD)</CardTitle>
             <CardDescription>Perbandingan penjualan bulan ini dengan bulan lalu</CardDescription>
@@ -420,7 +334,8 @@ const PenjualanPage = () => {
       </div>
 
       {/* Period selector and chart */}
-      <Card className="overflow-hidden">
+      <Card className="shadow-md border-orange-100 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-bold">Tren Penjualan</CardTitle>
@@ -449,20 +364,62 @@ const PenjualanPage = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-0 pt-0">
-          <ClientOnly>
-            <Chart 
-              options={chartOptions as any}
-              series={chartData[period as keyof typeof chartData].series}
-              type="area"
-              height={350}
-            />
-          </ClientOnly>
+        <CardContent className="px-0 pt-4">
+          {isMounted && (
+            <ClientOnlyRecharts height={350}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={formatChartData()}
+                  margin={{ top: 10, right: 30, left: 30, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="colorPenjualan" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#f1f5f9' }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tickFormatter={(value) => formatRupiah(value)}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    axisLine={{ stroke: '#f1f5f9' }}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [formatRupiah(value), 'Penjualan']}
+                    contentStyle={{
+                      fontSize: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                      border: 'none'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="penjualan" 
+                    stroke="#f97316" 
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorPenjualan)" 
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ClientOnlyRecharts>
+          )}
         </CardContent>
       </Card>
 
       {/* Top Products Table */}
-      <Card>
+      <Card className="shadow-md border-orange-100 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle className="text-xl font-bold">Penjualan per Produk</CardTitle>
@@ -576,7 +533,8 @@ const PenjualanPage = () => {
       </Card>
 
       {/* Transactions table */}
-      <Card>
+      <Card className="shadow-md border-orange-100 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-600 to-amber-500"></div>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle className="text-xl font-bold">Riwayat Transaksi</CardTitle>

@@ -29,6 +29,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, LineChart, Line, ResponsiveContainer 
 } from 'recharts';
+import ClientOnlyRecharts from '@/components/charts/client-only-recharts';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import * as XLSX from 'xlsx';
@@ -1251,18 +1252,20 @@ const CustomerDetailModal = ({
                   <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 to-amber-500"></div>
                   <CardContent className="p-5">
                     <h3 className="text-lg font-bold mb-4 text-gray-800">Pembelanjaan per Cabang</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={spendingByBranch}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
-                        <XAxis dataKey="name" tick={{fontSize: 12}} />
-                        <YAxis tickFormatter={(value) => `Rp${(value/1000)}K`} tick={{fontSize: 12}} />
-                        <Tooltip 
-                          formatter={(value) => formatRupiah(Number(value))}
-                          labelStyle={{fontWeight: 'bold'}}
-                        />
-                        <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <ClientOnlyRecharts height={300}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={spendingByBranch}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                          <XAxis dataKey="name" tick={{fontSize: 12}} />
+                          <YAxis tickFormatter={(value) => `Rp${(value/1000)}K`} tick={{fontSize: 12}} />
+                          <Tooltip 
+                            formatter={(value) => formatRupiah(Number(value))}
+                            labelStyle={{fontWeight: 'bold'}}
+                          />
+                          <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ClientOnlyRecharts>
                   </CardContent>
                 </Card>
 
@@ -1271,23 +1274,25 @@ const CustomerDetailModal = ({
                   <div className="h-1.5 w-full bg-gradient-to-r from-orange-400 to-amber-500"></div>
                   <CardContent className="p-5">
                     <h3 className="text-lg font-bold mb-4 text-gray-800">Frekuensi Transaksi</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={getTransactionFrequency()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
-                        <XAxis dataKey="name" tick={{fontSize: 12}} />
-                        <YAxis yAxisId="left" tick={{fontSize: 12}} />
-                        <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `Rp${(value/1000)}K`} tick={{fontSize: 12}} />
-                        <Tooltip 
-                          formatter={(value, name) => 
-                            name === 'count' ? `${value} transaksi` : formatRupiah(Number(value))
-                          }
-                          labelStyle={{fontWeight: 'bold'}}
-                        />
-                        <Legend />
-                        <Line yAxisId="left" type="monotone" dataKey="count" name="Jumlah Transaksi" stroke="#f97316" activeDot={{ r: 8 }} />
-                        <Line yAxisId="right" type="monotone" dataKey="value" name="Nilai Transaksi" stroke="#fbbf24" />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <ClientOnlyRecharts height={300}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={getTransactionFrequency()}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                          <XAxis dataKey="name" tick={{fontSize: 12}} />
+                          <YAxis yAxisId="left" tick={{fontSize: 12}} />
+                          <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `Rp${(value/1000)}K`} tick={{fontSize: 12}} />
+                          <Tooltip 
+                            formatter={(value, name) => 
+                              name === 'count' ? `${value} transaksi` : formatRupiah(Number(value))
+                            }
+                            labelStyle={{fontWeight: 'bold'}}
+                          />
+                          <Legend />
+                          <Line yAxisId="left" type="monotone" dataKey="count" name="Jumlah Transaksi" stroke="#f97316" activeDot={{ r: 8 }} />
+                          <Line yAxisId="right" type="monotone" dataKey="value" name="Nilai Transaksi" stroke="#fbbf24" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ClientOnlyRecharts>
                   </CardContent>
                 </Card>
 
